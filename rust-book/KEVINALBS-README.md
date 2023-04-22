@@ -1,0 +1,1 @@
+Access book with: `rustup doc --book`.
