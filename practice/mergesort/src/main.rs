@@ -39,7 +39,7 @@ fn merge_separate(a1 : Vec<i32>, a2  : Vec<i32>) -> Vec<i32>
     return ret;
 }
 
-fn merge_inplace(s : &mut [i32], lo1 : usize, hi1 : usize, lo2 : usize, hi2 : usize) {
+fn merge_inplace<T: std::cmp::PartialOrd + Copy> (s : &mut [T], lo1 : usize, hi1 : usize, lo2 : usize, hi2 : usize) {
     // lo1 and hi1 are inclusive.
     // lo2 and hi2 are inclusive.
     assert_eq!(hi1 + 1, lo2);
@@ -76,18 +76,36 @@ fn merge_inplace(s : &mut [i32], lo1 : usize, hi1 : usize, lo2 : usize, hi2 : us
     }
 }
 
+fn mergesort (s : &mut [i32]) {
+
+}
+
 
 #[test]
 fn test_merge () {
     assert_eq!(merge_separate(vec![1], vec![0]), vec![0,1]);
+    // Can merge in place.
     {
         let mut s = [1,3,5,2,4,6];
         merge_inplace (&mut s, 0, 2, 3, 5);
         assert_eq!(s, [1,2,3,4,5,6]);
     }
+    // Can merge in place with two elements.
     {
         let mut s = [2, 1];
         merge_inplace (&mut s, 0, 0, 1, 1);
         assert_eq!(s, [1,2]);
+    }
+    // Can merge floats.
+    {
+        let mut s = [1.0,3.0,5.0,2.0,4.0,6.0];
+        merge_inplace (&mut s, 0, 2, 3, 5);
+        assert_eq!(s, [1.0,2.0,3.0,4.0,5.0,6.0]);
+    }
+    // Can merge sort.
+    {
+        let mut s = [3,1,2];
+        mergesort (&mut s);
+        assert_eq!(s, [1,2,3]);
     }
 }
