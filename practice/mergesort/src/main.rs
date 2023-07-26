@@ -1,10 +1,10 @@
 // DONE: merge in-place
 // DONE: merge with slice of i32
-// TODO: make merge generic
-// TODO: implement sort
+// DONE: make merge generic
+// DONE: implement sort
 
 fn main() {
-    println!("Hello, world!");
+    println!("Run `cargo test` to run tests.");
 }
 
 // = help: the trait `Sized` is not implemented for `[i32]`
@@ -72,12 +72,38 @@ fn merge_inplace<T: std::cmp::PartialOrd + Copy> (s : &mut [T], lo1 : usize, hi1
         out.push(min)
     }
     for (idx, val) in out.iter().enumerate() {
-        s[idx] = *val;
+        s[idx + lo1] = *val;
     }
 }
 
-fn mergesort (s : &mut [i32]) {
+fn mergesort_recursive<T: std::cmp::PartialOrd + Copy> (s : &mut [T], lo1 : usize, hi1 : usize, lo2: usize, hi2: usize) {
+    assert! (hi1 >= lo1);
+    assert! (hi2 >= lo2);
+    assert_eq! (hi1 + 1, lo2);
 
+    if hi1 > lo1 {
+        // More than one element in left. Recurse left.
+        let mid = lo1 + ((hi1 - lo1) / 2);
+        mergesort_recursive (s, lo1, mid, mid + 1, hi1, depth + 1);
+    }
+
+    if hi2 > lo2 {
+        // More than one element in right. Recurse right.
+        let mid = lo2 + ((hi2 - lo2) / 2);
+        mergesort_recursive (s, lo2, mid, mid + 1, hi2, depth + 1);
+    }
+
+    // Merge halves. Handles the base case where each half is exactly one element.
+    merge_inplace (s, lo1, hi1, lo2, hi2);
+}
+
+fn mergesort (s : &mut [i32]) {
+    if s.len() <= 1 {
+        return;
+    }
+    let mid = (s.len() - 1) / 2;
+    assert!(mid + 1 <= s.len() - 1);
+    mergesort_recursive (s, 0, mid, mid + 1, s.len() - 1);
 }
 
 
@@ -107,5 +133,19 @@ fn test_merge () {
         let mut s = [3,1,2];
         mergesort (&mut s);
         assert_eq!(s, [1,2,3]);
+    }
+
+    // Can merge sort two elements.
+    {
+        let mut s = [3,1];
+        mergesort (&mut s);
+        assert_eq!(s, [1,3]);
+    }
+
+    // Can merge sort many elements.
+    {
+        let mut s = [3,1,1,5,10,200,18];
+        mergesort (&mut s);
+        assert_eq!(s, [1,1,3,5,10,18,200]);
     }
 }
