@@ -1,0 +1,1 @@
+~/bin/mongodb-macos-aarch64-enterprise-6.0.8/bin/mongod --dbpath ~/bin/mongodb-data --port 27021
