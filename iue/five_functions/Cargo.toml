@@ -5,4 +5,15 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[dependencies.mongodb]
+version = "2.6.1"
+features = [ "in-use-encryption-unstable" ]
+
 [dependencies]
+tokio = { version = "1.0", features = ["full"] }
+
+serde_json = "1.0.107"
+# TODO: remove these temporary dependencies ... begin
+rand = "0.8.4"
+# TODO: remove these temporary dependencies ... end
+dirs = "5.0.1"
