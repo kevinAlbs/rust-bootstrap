@@ -10,105 +10,173 @@
 // mongodb://localhost:27017.
 
 use mongodb::{
-    bson::{self, doc, Binary, Document},
+    bson::{self, doc, Document},
     client_encryption::{ClientEncryption, MasterKey},
-    error::Result,
-    mongocrypt::ctx::Algorithm,
-    mongocrypt::ctx::KmsProvider,
+    mongocrypt::ctx::{Algorithm, KmsProvider},
+    options::{ClientOptions, TlsOptions},
     Client, Namespace,
 };
-use rand::Rng;
 
-async fn encrypt_value(ce: &ClientEncryption, keyid: &Binary, val: i32) -> Binary {
-    let res = ce
-        .encrypt(val, keyid.clone(), Algorithm::Unindexed)
-        .run()
-        .await
-        .expect("should succeed");
-    return res;
-}
-
-use std::path::Path;
 use std::path::PathBuf;
 
-async fn read_kms_providers(
-    path: &Path,
-) -> std::result::Result<Document, Box<dyn std::error::Error>> {
-    // Read file.
-    let contents = std::fs::read_to_string(path)?;
-    // TODO: can I wrap the error message with more helpful context?
-    // Parse contents into a serde_json::Map.
-    let parsed: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&contents)?;
-    // Parse serde_json::Map to a bson::Document.
-    let doc = bson::Document::try_from(parsed)?;
-    return Ok(doc);
-}
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    const URI: &str = "mongodb://localhost:27017";
-
-    // Read KMS providers from JSON file.
-    {
-        let path: PathBuf = {
-            let path_from_env = std::env::var("KMS_PROVIDERS_PATH");
-            match path_from_env {
-                Ok(path_str) => PathBuf::from(path_str),
-                Err(err) => {
-                    match err {
-                        std::env::VarError::NotPresent => {
-                            // Try to apply default path: <home>/.iue/kms_providers.json.
-                            match dirs::home_dir() {
-                                Some(path_buf) => path_buf.join(".iue").join("kms_providers.json"),
-                                None => {
-                                    panic!("Unable to determine path to KMS providers file. KMS_PROVIDERS_PATH not set. Unable to apply default path <home>/.iue/kms_providers.json");
-                                }
+async fn get_kms_providers() -> Vec<(KmsProvider, Document, Option<TlsOptions>)> {
+    let path: PathBuf = {
+        let path_from_env = std::env::var("KMS_PROVIDERS_PATH");
+        match path_from_env {
+            Ok(path_str) => PathBuf::from(path_str),
+            Err(err) => {
+                match err {
+                    std::env::VarError::NotPresent => {
+                        // Try to apply default path: <home>/.iue/kms_providers.json.
+                        match dirs::home_dir() {
+                            Some(path_buf) => path_buf.join(".iue").join("kms_providers.json"),
+                            None => {
+                                panic!("Unable to determine path to KMS providers file. KMS_PROVIDERS_PATH not set. Unable to apply default path <home>/.iue/kms_providers.json");
                             }
                         }
-                        _ => {
-                            panic!("Unable to read environment variable: KMS_PROVIDERS_PATH. Error: {}", err);
-                        }
+                    }
+                    _ => {
+                        panic!(
+                            "Unable to read environment variable: KMS_PROVIDERS_PATH. Error: {}",
+                            err
+                        );
                     }
                 }
             }
-        };
-
-        let res = read_kms_providers(&path).await;
-        if !res.is_ok() {
-            println!(
-                "Failed to read KMS providers document at path {}. Error: {}",
-                path.to_str().unwrap_or("<unable to read>"),
-                res.err().unwrap()
-            );
         }
-    }
-
-    let mut key_bytes = vec![0u8; 96];
-    rand::thread_rng().fill(&mut key_bytes[..]);
-    let local_master_key = bson::Binary {
-        subtype: bson::spec::BinarySubtype::Generic,
-        bytes: key_bytes,
     };
-    let kms_providers = vec![(KmsProvider::Local, doc! { "key": local_master_key }, None)];
+
+    // Read file.
+    let contents = std::fs::read_to_string(&path).expect(
+        format!(
+            "should read file: {}",
+            path.to_str().unwrap_or("<cannot read path>")
+        )
+        .as_str(),
+    );
+
+    // Parse contents into a serde_json::Map.
+    let parsed: serde_json::Map<String, serde_json::Value> =
+        serde_json::from_str(&contents).expect("should parse as JSON");
+
+    // Parse serde_json::Map to a bson::Document.
+    let doc = bson::Document::try_from(parsed).expect("should convert JSON to BSON");
+
+    // Construct a Vec<(KmsProvider, Document)> from the Document.
+    let mut kms_providers: Vec<(KmsProvider, Document, Option<TlsOptions>)> = Vec::new();
+    for (k, v) in doc.iter() {
+        let kms_provider = KmsProvider::from_name(k);
+        match kms_provider {
+            KmsProvider::Other(s) => {
+                panic!("Unexpected KMS provider: {}.", s)
+            }
+            _ => {}
+        };
+        let kms_provider_doc = v.as_document().expect(
+            format!(
+                "expected document for {}, got: {:?}",
+                k.as_str(),
+                v.element_type()
+            )
+            .as_str(),
+        );
+        kms_providers.push((kms_provider, kms_provider_doc.clone(), None));
+    }
+    return kms_providers;
+}
+
+#[tokio::main]
+async fn main() {
+    let uri = std::env::var("MONGODB_URI").unwrap_or("mongodb://localhost:27017".to_string());
+
+    // Read KMS providers from JSON file.
+    let kms_providers = get_kms_providers().await;
     let key_vault_namespace = Namespace::new("keyvault", "datakeys");
-    let key_vault_client = Client::with_uri_str(URI).await?;
-    let key_vault = key_vault_client
-        .database(&key_vault_namespace.db)
-        .collection::<Document>(&key_vault_namespace.coll);
-    key_vault.drop(None).await?;
-    let client_encryption = ClientEncryption::new(
+    let key_vault_client = Client::with_uri_str(&uri)
+        .await
+        .expect("should create Client");
+
+    // Create a ClientEncryption struct.
+    // A ClientEncryption struct provides admin helpers with three functions:
+    // 1. create a data key
+    // 2. explicit encrypt
+    // 3. explicit decrypt
+    let ce = ClientEncryption::new(
         key_vault_client,
         key_vault_namespace.clone(),
         kms_providers.clone(),
-    )?;
-    let key1_id = client_encryption
-        .create_data_key(MasterKey::Local)
-        .key_alt_names(["firstName".to_string()])
-        .run()
-        .await?;
+    )
+    .expect("should create ClientEncryption");
 
-    // Attempt to encrypt a QE value with keyAltName.
-    let got = encrypt_value(&client_encryption, &key1_id, 666).await;
-    println!("encrypted to value: {}", got);
-    return Ok(());
+    println!("CreateDataKey... begin");
+    let keyid = ce
+        .create_data_key(MasterKey::Local)
+        .run()
+        .await
+        .expect("should create data key");
+    println!("Created key with a UUID: {}", keyid);
+    println!("CreateDataKey... end");
+
+    println!("Encrypt... begin");
+    let ciphertext = ce
+        .encrypt(
+            "test",
+            keyid.clone(),
+            Algorithm::AeadAes256CbcHmacSha512Deterministic,
+        )
+        .run()
+        .await
+        .expect("should encrypt");
+    println!("Explicitly encrypted to ciphertext: {:?}", ciphertext);
+    println!("Encrypt... end");
+
+    println!("Decrypt... begin");
+    let plaintext = ce
+        .decrypt(ciphertext.as_raw_binary())
+        .await
+        .expect("should decrypt");
+    println!("Explicitly decrypted to plaintext: {:?}", plaintext);
+    println!("Decrypt... end");
+
+    let schema = doc! {
+        "properties": {
+            "encryptMe": {
+                "encrypt": {
+                    "keyId": [keyid],
+                    "bsonType": "string",
+                    "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic",
+                }
+            }
+        },
+        "bsonType": "object",
+    };
+
+    let client = Client::encrypted_builder(
+        ClientOptions::parse(&uri).await.expect("should parse URI"),
+        key_vault_namespace,
+        kms_providers,
+    )
+    .expect("should create builder")
+    .schema_map([("db.coll".to_string(), schema)])
+    .build()
+    .await
+    .expect("should build encrypted client");
+
+    let coll = client.database("db").collection("coll");
+    coll.drop(None).await.expect("should drop");
+
+    println!("Automatic encryption ... begin");
+    coll.insert_one(doc! {"encryptMe": "test"}, None)
+        .await
+        .expect("should insert");
+    println!("Automatic encryption ... end");
+
+    println!("Automatic decryption ... begin");
+    let res = coll
+        .find_one(doc! {}, None)
+        .await
+        .expect("should find result")
+        .expect("should find document");
+    println!("Decrypted document: {:?}", res);
+    println!("Automatic decryption ... end");
 }
