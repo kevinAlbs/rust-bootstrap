@@ -7,6 +7,7 @@ pub struct CPU {
     pub status: u8,
     pub program_counter: u16,
     memory: [u8; 0xFFFF],
+    trace: bool,
 }
 
 #[derive(Debug)]
@@ -19,6 +20,7 @@ pub enum AddressingMode {
     Absolute,
     Absolute_X,
     Absolute_Y,
+    Indirect,
     Indirect_X,
     Indirect_Y,
     NoneAddressing,
@@ -33,7 +35,12 @@ impl CPU {
             status: 0,
             program_counter: 0,
             memory: [0; 0xFFFF],
+            trace: false,
         }
+    }
+
+    pub fn set_trace_mode(&mut self, val: bool) {
+        self.trace = val;
     }
 
     fn get_operand_address(&self, mode: &AddressingMode) -> u16 {
@@ -75,6 +82,14 @@ impl CPU {
                 let hi = self.mem_read((base as u8).wrapping_add(1) as u16);
                 let deref_base = (hi as u16) << 8 | (lo as u16);
                 let deref = deref_base.wrapping_add(self.register_y as u16);
+                deref
+            }
+            AddressingMode::Indirect => {
+                let base = self.mem_read_u16(self.program_counter);
+
+                let lo = self.mem_read(base);
+                let hi = self.mem_read(base.wrapping_add(1));
+                let deref = (hi as u16) << 8 | (lo as u16);
                 deref
             }
             AddressingMode::NoneAddressing => {
@@ -147,6 +162,14 @@ impl CPU {
             }
             let opcode = *opcode.unwrap();
 
+            if self.trace {
+                print!("\n{} ({:02x})", opcode.name, opcode.code);
+                for i in 0..(opcode.bytes - 1) {
+                    print!(" {:02x}", self.mem_read(self.program_counter + i));
+                }
+                println!();
+            }
+
             match opcode.name {
                 "LDA" => {
                     // Load A.
@@ -175,6 +198,42 @@ impl CPU {
                     // Break.
                     return;
                 }
+                "JMP" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    if self.trace {
+                        println!("  JMP to address: 0x{:02x}", addr);
+                    }
+                    self.program_counter = addr;
+                }
+                "ADC" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    let value = self.mem_read(addr);
+                    if self.trace {
+                        println!(
+                            "  ADC with value: 0x{:02x}. Carry is: {}",
+                            value,
+                            self.get_carry()
+                        );
+                    }
+
+                    let carry = self.get_carry();
+                    self.clear_carry();
+                    // Add carry.
+                    let (res, overflowed) = self.register_a.overflowing_add(carry);
+                    if overflowed {
+                        self.set_carry();
+                    }
+                    self.register_a = res;
+
+                    // Add value.
+                    let (res, overflowed) = self.register_a.overflowing_add(value);
+                    if overflowed {
+                        self.set_carry();
+                    }
+                    self.register_a = res;
+
+                    self.program_counter += opcode.bytes - 1;
+                }
                 _ => {
                     todo!();
                 }
@@ -195,10 +254,23 @@ impl CPU {
             self.status = self.status & !0b1000_0000;
         }
     }
+
+    fn get_carry(&self) -> u8 {
+        return self.status & 0b0000_0001;
+    }
+
+    fn set_carry(&mut self) {
+        self.status = self.status | 0b0000_0001;
+    }
+
+    fn clear_carry(&mut self) {
+        self.status = self.status & !(0b0000_0001);
+    }
 }
 
 #[cfg(test)]
 mod test {
+
     use super::*;
 
     #[test]
@@ -340,5 +412,211 @@ mod test {
         assert_eq!(cpu.mem_read(3), 123);
     }
 
+    #[test]
+    fn test_jmp_absolute() {
+        let mut cpu = CPU::new();
+        // Program is loaded at address 0x8000. Jump to 0x8004
+        cpu.load(vec![
+            0x4C, 0x04, 0x80, // Jump to 0x8004.
+            0xFF, // Invalid instruction.
+            0xa9, // LDA Immediate.
+            0x01,
+        ]);
+        cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+        cpu.run();
+        assert_eq!(cpu.register_a, 0x01);
+    }
+
+    #[test]
+    fn test_jmp_indirect() {
+        let mut cpu = CPU::new();
+        // Program is loaded at address 0x8000.
+        cpu.load(vec![
+            0x6C, 0x03, 0x80, // Jump to address stored at 0x8003.
+            0x06, 0x80, // Address 0x8006
+            0xFF, // Invalid instruction.
+            0xa9, // LDA Immediate.
+            0x01,
+        ]);
+        cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+        cpu.run();
+        assert_eq!(cpu.register_a, 0x01);
+    }
+
     // TODO: test LDA with indirect addressing mode.
+
+    #[test]
+    fn test_0x69_adc_immediate() {
+        let mut cpu = CPU::new();
+        cpu.trace = true;
+        // Adds 1.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x69, 0x01, // Add 1.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0x01);
+            assert_eq!(cpu.get_carry(), 0);
+        }
+        // Sets carry bit on overflow.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x69, 0xFF, // Add 255.
+                0x69, 0x01, // Add 1.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0x00);
+            assert_eq!(cpu.get_carry(), 1);
+        }
+        // Uses carry bit after overflow.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x69, 0xFF, // Add 255.
+                0x69, 0x01, // Add 1.
+                0x69, 0x00, // Add 0.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0x01);
+            assert_eq!(cpu.get_carry(), 0);
+        }
+    }
+
+    #[test]
+    fn test_0x65_adc_zeropage() {
+        let mut cpu = CPU::new();
+        cpu.trace = true;
+        // Adds 123.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x65, 0x01, // Add from memory location 1.
+            ]);
+            cpu.mem_write(0x01, 123);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+            assert_eq!(cpu.get_carry(), 0);
+        }
+    }
+
+    #[test]
+    fn test_0x75_adc_zeropage_x() {
+        let mut cpu = CPU::new();
+        cpu.trace = true;
+        // Adds 123.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x75, 0x01, // Add from memory location 0x01 + x.
+            ]);
+            cpu.register_x = 2;
+            cpu.mem_write(0x03, 123);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+            assert_eq!(cpu.get_carry(), 0);
+        }
+    }
+
+    #[test]
+    fn test_0x6d_adc_absolute() {
+        let mut cpu = CPU::new();
+        cpu.trace = true;
+        // Adds 123.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x6D, 0x03, 0x00, // Add from memory location 0x03.
+            ]);
+            cpu.mem_write(0x03, 123);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+            assert_eq!(cpu.get_carry(), 0);
+        }
+    }
+
+    #[test]
+    fn test_0x7d_adc_absolute_x() {
+        let mut cpu = CPU::new();
+        cpu.trace = true;
+        // Adds 123.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x7d, 0x01, 0x00, // Add from memory location 0x01 + x.
+            ]);
+            cpu.register_x = 2;
+            cpu.mem_write(0x03, 123);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+            assert_eq!(cpu.get_carry(), 0);
+        }
+    }
+
+    #[test]
+    fn test_0x79_adc_absolute_y() {
+        let mut cpu = CPU::new();
+        cpu.trace = true;
+        // Adds 123.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x79, 0x01, 0x00, // Add from memory location 0x01 + y.
+            ]);
+            cpu.register_y = 2;
+            cpu.mem_write(0x03, 123);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+            assert_eq!(cpu.get_carry(), 0);
+        }
+    }
+
+    #[test]
+    fn test_0x61_adc_indirect_x() {
+        let mut cpu = CPU::new();
+        cpu.trace = true;
+        // Adds 123.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x61, 0x01, // Add from memory location *(0x0001 + x).
+            ]);
+            cpu.register_x = 2;
+            cpu.mem_write_u16(0x0003, 0x0005); // Value at 0x0003 is 0x0005
+            cpu.mem_write(0x0005, 123);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+            assert_eq!(cpu.get_carry(), 0);
+        }
+    }
+
+    #[test]
+    fn test_0x71_adc_indirect_y() {
+        let mut cpu = CPU::new();
+        cpu.trace = true;
+        // Adds 123.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x71, 0x01, // Add from memory location *(0x0001) + y.
+            ]);
+            cpu.register_y = 2;
+            cpu.mem_write_u16(0x0001, 0x0003);
+            cpu.mem_write(0x0005, 123);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+            assert_eq!(cpu.get_carry(), 0);
+        }
+    }
 }
