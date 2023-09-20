@@ -21,8 +21,8 @@ pub enum AddressingMode {
     Absolute_X,
     Absolute_Y,
     Indirect,
-    Indirect_X,
-    Indirect_Y,
+    Indirect_X, // Deref, Shift, Deref
+    Indirect_Y, // Deref, Deref, Shift
     NoneAddressing,
 }
 
