@@ -47,13 +47,12 @@ async fn get_kms_providers() -> Vec<(KmsProvider, Document, Option<TlsOptions>)>
     };
 
     // Read file.
-    let contents = std::fs::read_to_string(&path).expect(
-        format!(
+    let contents = std::fs::read_to_string(&path).unwrap_or_else(|_| {
+        panic!(
             "should read file: {}",
             path.to_str().unwrap_or("<cannot read path>")
-        )
-        .as_str(),
-    );
+        );
+    });
 
     // Parse contents into a serde_json::Map.
     let parsed: serde_json::Map<String, serde_json::Value> =
@@ -66,23 +65,19 @@ async fn get_kms_providers() -> Vec<(KmsProvider, Document, Option<TlsOptions>)>
     let mut kms_providers: Vec<(KmsProvider, Document, Option<TlsOptions>)> = Vec::new();
     for (k, v) in doc.iter() {
         let kms_provider = KmsProvider::from_name(k);
-        match kms_provider {
-            KmsProvider::Other(s) => {
-                panic!("Unexpected KMS provider: {}.", s)
-            }
-            _ => {}
-        };
-        let kms_provider_doc = v.as_document().expect(
-            format!(
+        if let KmsProvider::Other(s) = kms_provider {
+            panic!("Unexpected KMS provider: {}.", s)
+        }
+        let kms_provider_doc = v.as_document().unwrap_or_else(|| {
+            panic!(
                 "expected document for {}, got: {:?}",
                 k.as_str(),
                 v.element_type()
-            )
-            .as_str(),
-        );
+            );
+        });
         kms_providers.push((kms_provider, kms_provider_doc.clone(), None));
     }
-    return kms_providers;
+    kms_providers
 }
 
 #[tokio::main]
