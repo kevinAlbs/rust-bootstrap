@@ -248,6 +248,31 @@ impl CPU {
                     self.set_zero_and_negative_flags(self.register_a);
                     self.program_counter += opcode.bytes - 1;
                 }
+                "ASL" => {
+                    let val;
+                    if let AddressingMode::Immediate = opcode.mode {
+                        val = self.register_a;
+                    } else {
+                        let addr = self.get_operand_address(&opcode.mode);
+                        val = self.mem_read(addr);
+                    }
+
+                    if val & 0b1000_0000 == 0b1000_0000 {
+                        self.status = self.status | CPU::CARRY_FLAG;
+                    }
+
+                    let result = val << 1;
+
+                    if result == 0 {
+                        self.status = self.status | CPU::ZERO_FLAG;
+                    }
+
+                    if result & 0b1000_0000 == 0b1000_0000 {
+                        self.status = self.status | CPU::NEGATIVE_FLAG;
+                    }
+
+                    self.register_a = result;
+                }
                 _ => {
                     todo!();
                 }
@@ -670,4 +695,59 @@ mod test {
 
     // AND operations with other AddressingMode values are not tested.
     // Assuming testing ADC with all AddressingMode is sufficient.
+
+    #[test]
+    fn test_0x0a_asl_immediate() {
+        let mut cpu = CPU::new();
+        {
+            cpu.reset();
+            cpu.load(vec![0x0A]);
+            cpu.register_a = 0b0000_0001;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b0000_0010);
+            assert_eq!(cpu.status & CPU::ZERO_FLAG, 0);
+            assert_eq!(cpu.status & CPU::CARRY_FLAG, 0);
+            assert_eq!(cpu.status & CPU::NEGATIVE_FLAG, 0);
+        }
+
+        // Check that carry flag is set.
+        {
+            cpu.reset();
+            cpu.load(vec![0x0A]);
+            cpu.register_a = 0b1000_0001;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b0000_0010);
+            assert_eq!(cpu.status & CPU::ZERO_FLAG, 0);
+            assert_eq!(cpu.status & CPU::CARRY_FLAG, CPU::CARRY_FLAG);
+            assert_eq!(cpu.status & CPU::NEGATIVE_FLAG, 0);
+        }
+
+        // Check that negative flag is set.
+        {
+            cpu.reset();
+            cpu.load(vec![0x0A]);
+            cpu.register_a = 0b0100_0001;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b1000_0010);
+            assert_eq!(cpu.status & CPU::ZERO_FLAG, 0);
+            assert_eq!(cpu.status & CPU::CARRY_FLAG, 0);
+            assert_eq!(cpu.status & CPU::NEGATIVE_FLAG, CPU::NEGATIVE_FLAG);
+        }
+
+        // Check that zero flag is set.
+        {
+            cpu.reset();
+            cpu.load(vec![0x0A]);
+            cpu.register_a = 0b0000_0000;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b0000_0000);
+            assert_eq!(cpu.status & CPU::ZERO_FLAG, CPU::ZERO_FLAG);
+            assert_eq!(cpu.status & CPU::CARRY_FLAG, 0);
+            assert_eq!(cpu.status & CPU::NEGATIVE_FLAG, 0);
+        }
+    }
 }
