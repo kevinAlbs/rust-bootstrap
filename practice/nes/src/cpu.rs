@@ -255,30 +255,34 @@ impl CPU {
         }
     }
 
+    pub const ZERO_FLAG: u8 = 0b0000_0010;
+    pub const NEGATIVE_FLAG: u8 = 0b1000_0000;
+    pub const CARRY_FLAG: u8 = 0b0000_0001;
+
     fn set_zero_and_negative_flags(&mut self, val: u8) {
         if val == 0 {
-            self.status = self.status | 0b0000_0010;
+            self.status = self.status | CPU::ZERO_FLAG;
         } else {
-            self.status = self.status & !0b0000_0010;
+            self.status = self.status & !CPU::ZERO_FLAG;
         }
 
         if val & 0b1000_0000 != 0 {
-            self.status = self.status | 0b1000_0000;
+            self.status = self.status | CPU::NEGATIVE_FLAG;
         } else {
-            self.status = self.status & !0b1000_0000;
+            self.status = self.status & !CPU::NEGATIVE_FLAG;
         }
     }
 
     fn get_carry(&self) -> u8 {
-        return self.status & 0b0000_0001;
+        return self.status & CPU::CARRY_FLAG;
     }
 
     fn set_carry(&mut self) {
-        self.status = self.status | 0b0000_0001;
+        self.status = self.status | CPU::CARRY_FLAG;
     }
 
     fn clear_carry(&mut self) {
-        self.status = self.status & !(0b0000_0001);
+        self.status = self.status & !(CPU::CARRY_FLAG);
     }
 }
 
