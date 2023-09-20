@@ -234,6 +234,20 @@ impl CPU {
 
                     self.program_counter += opcode.bytes - 1;
                 }
+                "AND" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    let value = self.mem_read(addr);
+                    if self.trace {
+                        println!(
+                            "  AND with value: 0b{:08b}. Register A is: 0b{:08b}",
+                            value, self.register_a
+                        );
+                    }
+
+                    self.register_a = self.register_a & value;
+                    self.set_zero_and_negative_flags(self.register_a);
+                    self.program_counter += opcode.bytes - 1;
+                }
                 _ => {
                     todo!();
                 }
@@ -619,4 +633,45 @@ mod test {
             assert_eq!(cpu.get_carry(), 0);
         }
     }
+
+    #[test]
+    fn test_0x29_and_immediate() {
+        let mut cpu = CPU::new();
+        // AND 1001 and 1101
+        {
+            cpu.reset();
+            cpu.load(vec![0x29, 0b1101]);
+            cpu.register_a = 0b1001;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b1001);
+        }
+
+        // Check that negative flag is set.
+        {
+            cpu.reset();
+            cpu.load(vec![0x29, 0b1000_0000]);
+            cpu.register_a = 0b1000_0000;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b1000_0000);
+            // Check that negative flag is set.
+            assert!(cpu.status & 0b1000_0000 == 0b1000_0000);
+        }
+
+        // Check that zero flag is set.
+        {
+            cpu.reset();
+            cpu.load(vec![0x29, 0b1]);
+            cpu.register_a = 0b0;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b0);
+            // Check that zero flag is set.
+            assert!(cpu.status & 0b0000_0010 == 0b0000_0010);
+        }
+    }
+
+    // AND operations with other AddressingMode values are not tested.
+    // Assuming testing ADC with all AddressingMode is sufficient.
 }
