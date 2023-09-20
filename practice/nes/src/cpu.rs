@@ -462,7 +462,6 @@ mod test {
     #[test]
     fn test_0x69_adc_immediate() {
         let mut cpu = CPU::new();
-        cpu.trace = true;
         // Adds 1.
         {
             cpu.reset();
@@ -504,7 +503,6 @@ mod test {
     #[test]
     fn test_0x65_adc_zeropage() {
         let mut cpu = CPU::new();
-        cpu.trace = true;
         // Adds 123.
         {
             cpu.reset();
@@ -522,7 +520,6 @@ mod test {
     #[test]
     fn test_0x75_adc_zeropage_x() {
         let mut cpu = CPU::new();
-        cpu.trace = true;
         // Adds 123.
         {
             cpu.reset();
@@ -541,7 +538,6 @@ mod test {
     #[test]
     fn test_0x6d_adc_absolute() {
         let mut cpu = CPU::new();
-        cpu.trace = true;
         // Adds 123.
         {
             cpu.reset();
@@ -559,7 +555,6 @@ mod test {
     #[test]
     fn test_0x7d_adc_absolute_x() {
         let mut cpu = CPU::new();
-        cpu.trace = true;
         // Adds 123.
         {
             cpu.reset();
@@ -578,7 +573,6 @@ mod test {
     #[test]
     fn test_0x79_adc_absolute_y() {
         let mut cpu = CPU::new();
-        cpu.trace = true;
         // Adds 123.
         {
             cpu.reset();
@@ -597,7 +591,6 @@ mod test {
     #[test]
     fn test_0x61_adc_indirect_x() {
         let mut cpu = CPU::new();
-        cpu.trace = true;
         // Adds 123.
         {
             cpu.reset();
@@ -617,7 +610,6 @@ mod test {
     #[test]
     fn test_0x71_adc_indirect_y() {
         let mut cpu = CPU::new();
-        cpu.trace = true;
         // Adds 123.
         {
             cpu.reset();
