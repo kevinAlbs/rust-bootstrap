@@ -23,6 +23,7 @@ pub enum AddressingMode {
     Indirect,
     Indirect_X, // Deref, Shift, Deref
     Indirect_Y, // Deref, Deref, Shift
+    Relative,
     NoneAddressing,
 }
 
@@ -91,6 +92,14 @@ impl CPU {
                 let hi = self.mem_read(base.wrapping_add(1));
                 let deref = (hi as u16) << 8 | (lo as u16);
                 deref
+            }
+            AddressingMode::Relative => {
+                let signed_offset = self.mem_read(self.program_counter) as i8;
+                let mut base = self.program_counter;
+                (base, _) = base.overflowing_add_signed(signed_offset as i16);
+                // Add one to account for increment to program_counter.
+                base = base.wrapping_add(1);
+                base
             }
             AddressingMode::NoneAddressing => {
                 panic!("mode {:?} is not supported", mode);
@@ -163,7 +172,10 @@ impl CPU {
             let opcode = *opcode.unwrap();
 
             if self.trace {
-                print!("\n{} ({:02x})", opcode.name, opcode.code);
+                print!(
+                    "\npc={:04x} {} ({:02x})",
+                    self.program_counter, opcode.name, opcode.code
+                );
                 for i in 0..(opcode.bytes - 1) {
                     print!(" {:02x}", self.mem_read(self.program_counter + i));
                 }
@@ -272,6 +284,14 @@ impl CPU {
                     }
 
                     self.register_a = result;
+                }
+                "BCC" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    if self.status & CPU::CARRY_FLAG == 0b0000_0000 {
+                        self.program_counter = addr;
+                    } else {
+                        self.program_counter += opcode.bytes - 1;
+                    }
                 }
                 _ => {
                     todo!();
@@ -748,6 +768,40 @@ mod test {
             assert_eq!(cpu.status & CPU::ZERO_FLAG, CPU::ZERO_FLAG);
             assert_eq!(cpu.status & CPU::CARRY_FLAG, 0);
             assert_eq!(cpu.status & CPU::NEGATIVE_FLAG, 0);
+        }
+    }
+
+    #[test]
+    fn test_0x90_bcc() {
+        let mut cpu = CPU::new();
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x90, 0x01, // Jump one instruction ahead.
+                0xFF, // Invalid instruction.
+                0xA9, 123, 0x00, // LDA value 123.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+        }
+        cpu.trace = true;
+        // Test jumping negative.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x90,
+                0x04, // Jump four instructions ahead.
+                0xFF, // Invalid instruction.
+                0xA9,
+                123,
+                0x00, // LDA value 123.
+                0x90,
+                (-5i8 as u8), // Jump five instructions behind.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
         }
     }
 }

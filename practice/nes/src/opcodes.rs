@@ -27,6 +27,8 @@ use lazy_static::lazy_static;
 
 lazy_static! {
     pub static ref CPU_OP_CODES: Vec<OpCode> = vec![
+        // TODO: check and fix cycle counts.
+
         OpCode::new(0x00, "BRK", 1, 7, AddressingMode::NoneAddressing),
         OpCode::new(0xaa, "TAX", 1, 2, AddressingMode::NoneAddressing),
         OpCode::new(0xe8, "INX", 1, 2, AddressingMode::NoneAddressing),
@@ -74,6 +76,8 @@ lazy_static! {
         OpCode::new(0x16, "ASL", 2, 6, AddressingMode::ZeroPage_X),
         OpCode::new(0x0E, "ASL", 3, 6, AddressingMode::Absolute),
         OpCode::new(0x1E, "ASL", 3, 7, AddressingMode::Absolute_X),
+
+        OpCode::new(0x90, "BCC", 2, 2/*+1 if branch succeeds +2 if to a new page. */, AddressingMode::Relative),
 
     ];
 
