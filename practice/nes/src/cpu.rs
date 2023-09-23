@@ -167,7 +167,7 @@ impl CPU {
 
             let opcode = OPCODES_MAP.get(&op);
             if opcode.is_none() {
-                todo!();
+                todo!("opcode 0x{:02x} is not implemented", op);
             }
             let opcode = *opcode.unwrap();
 
@@ -293,6 +293,53 @@ impl CPU {
                         self.program_counter += opcode.bytes - 1;
                     }
                 }
+                "BCS" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    if self.status & CPU::CARRY_FLAG == CPU::CARRY_FLAG {
+                        self.program_counter = addr;
+                    } else {
+                        self.program_counter += opcode.bytes - 1;
+                    }
+                }
+                "BEQ" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    if self.status & CPU::ZERO_FLAG == CPU::ZERO_FLAG {
+                        self.program_counter = addr;
+                    } else {
+                        self.program_counter += opcode.bytes - 1;
+                    }
+                }
+                "BNE" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    if self.status & CPU::ZERO_FLAG == 0b0000_0000 {
+                        self.program_counter = addr;
+                    } else {
+                        self.program_counter += opcode.bytes - 1;
+                    }
+                }
+
+                "BIT" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    let val = self.mem_read(addr);
+                    if val & self.register_a == 0 {
+                        self.status = self.status | CPU::ZERO_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::ZERO_FLAG;
+                    }
+
+                    if val & CPU::OVERFLOW_FLAG != 0 {
+                        self.status = self.status | CPU::OVERFLOW_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::OVERFLOW_FLAG;
+                    }
+
+                    if val & CPU::NEGATIVE_FLAG != 0 {
+                        self.status = self.status | CPU::NEGATIVE_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::NEGATIVE_FLAG;
+                    }
+                    self.program_counter += opcode.bytes - 1;
+                }
                 _ => {
                     todo!();
                 }
@@ -303,6 +350,7 @@ impl CPU {
     pub const ZERO_FLAG: u8 = 0b0000_0010;
     pub const NEGATIVE_FLAG: u8 = 0b1000_0000;
     pub const CARRY_FLAG: u8 = 0b0000_0001;
+    pub const OVERFLOW_FLAG: u8 = 0b01000000;
 
     fn set_zero_and_negative_flags(&mut self, val: u8) {
         if val == 0 {
@@ -785,7 +833,6 @@ mod test {
             cpu.run();
             assert_eq!(cpu.register_a, 123);
         }
-        cpu.trace = true;
         // Test jumping negative.
         {
             cpu.reset();
@@ -802,6 +849,154 @@ mod test {
             cpu.program_counter = cpu.mem_read_u16(0xFFFC);
             cpu.run();
             assert_eq!(cpu.register_a, 123);
+        }
+    }
+
+    #[test]
+    fn test_0xb0_bcs() {
+        let mut cpu = CPU::new();
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xB0, 0x01, // Jump one instruction ahead.
+                0xFF, // Invalid instruction.
+                0xA9, 123, 0x00, // LDA value 123.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.status = CPU::CARRY_FLAG;
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+        }
+        // Does not jump if carry not set.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xB0, 0x01, // Jump one instruction ahead.
+                0x00, // Break.
+                0xA9, 123, 0x00, // LDA value 123.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0);
+        }
+    }
+
+    #[test]
+    fn test_0xfo_beq() {
+        let mut cpu = CPU::new();
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xF0, 0x01, // Jump one instruction ahead.
+                0xFF, // Invalid instruction.
+                0xA9, 123, 0x00, // LDA value 123.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.status = CPU::ZERO_FLAG;
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+        }
+        // Does not jump if zero not set.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xF0, 0x01, // Jump one instruction ahead.
+                0x00, // Break.
+                0xA9, 123, 0x00, // LDA value 123.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0);
+        }
+    }
+
+    #[test]
+    fn test_0xfo_bne() {
+        let mut cpu = CPU::new();
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xD0, 0x01, // Jump one instruction ahead.
+                0xFF, // Invalid instruction.
+                0xA9, 123, 0x00, // LDA value 123.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+        }
+        // Does not jump if zero is set.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xD0, 0x01, // Jump one instruction ahead.
+                0x00, // Break.
+                0xA9, 123, 0x00, // LDA value 123.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.status = CPU::ZERO_FLAG;
+            cpu.run();
+            assert_eq!(cpu.register_a, 0);
+        }
+    }
+
+    #[test]
+    fn test_0x24_bit_zeropage() {
+        let mut cpu = CPU::new();
+
+        // Test with ZeroPage. Result is 1.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xA9, 0xF0, // LDA value 0xF0.
+                0x85, 0x01, // STA to address 0x01.
+                0xA9, 0xFF, // LDA value 0xFF.
+                0x24, 0x01, // BIT with address 0x01.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0xFF);
+            assert_eq!(cpu.status & CPU::ZERO_FLAG, 0b0000_0000);
+            assert_eq!(cpu.status & CPU::NEGATIVE_FLAG, CPU::NEGATIVE_FLAG);
+            assert_eq!(cpu.status & CPU::OVERFLOW_FLAG, CPU::OVERFLOW_FLAG);
+        }
+
+        // Test with ZeroPage. Result is 0.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xA9, 0xF0, // LDA value 0xF0.
+                0x85, 0x01, // STA to address 0x01.
+                0xA9, 0x0F, // LDA value 0x0F.
+                0x24, 0x01, // BIT with address 0x01.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0x0F);
+            assert_eq!(cpu.status & CPU::ZERO_FLAG, CPU::ZERO_FLAG);
+            assert_eq!(cpu.status & CPU::NEGATIVE_FLAG, CPU::NEGATIVE_FLAG);
+            assert_eq!(cpu.status & CPU::OVERFLOW_FLAG, CPU::OVERFLOW_FLAG);
+        }
+    }
+
+    #[test]
+    fn test_0x2c_bit_absolute() {
+        let mut cpu = CPU::new();
+
+        // Test with ZeroPage. Result is 1.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xA9, 0xF0, // LDA value 0xF0.
+                0x85, 0x01, // STA to address 0x01.
+                0xA9, 0xFF, // LDA value 0xFF.
+                0x2c, 0x01, 0x00, // BIT with address 0x01.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0xFF);
+            assert_eq!(cpu.status & CPU::ZERO_FLAG, 0b0000_0000);
+            assert_eq!(cpu.status & CPU::NEGATIVE_FLAG, CPU::NEGATIVE_FLAG);
+            assert_eq!(cpu.status & CPU::OVERFLOW_FLAG, CPU::OVERFLOW_FLAG);
         }
     }
 }

@@ -1,3 +1,8 @@
+https://www.nesdev.org/obelisk-6502-guide/reference.html#ASL
+ASL `Zero Flag` may be incorrectly documented. Says `Set if A = 0`. I expect this is meant to be `Set if result = 0`, since ASL may apply to accumulator or memory contents.
+
+https://bugzmanov.github.io/nes_ebook/chapter_3_2.html
+Does not refer to the "Indexed" addressing mode described on https://www.nesdev.org/obelisk-6502-guide/addressing.html#IND
 
 https://bugzmanov.github.io/nes_ebook/chapter_3_2.html
 `(hi << 8) | (lo as u16)` can be `(hi << 8) | lo` since `lo` is already `u16`.
