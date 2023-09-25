@@ -85,6 +85,16 @@ lazy_static! {
         OpCode::new(0x24, "BIT", 2, 3, AddressingMode::ZeroPage),
         OpCode::new(0x2c, "BIT", 3, 4, AddressingMode::Absolute),
 
+        OpCode::new(0x30, "BMI", 2, 2/*+1 if branch succeeds +2 if to a new page. */, AddressingMode::Relative),
+        OpCode::new(0x10, "BPL", 2, 2/*+1 if branch succeeds +2 if to a new page. */, AddressingMode::Relative),
+        OpCode::new(0x50, "BVC", 2, 2/*+1 if branch succeeds +2 if to a new page. */, AddressingMode::Relative),
+        OpCode::new(0x70, "BVS", 2, 2/*+1 if branch succeeds +2 if to a new page. */, AddressingMode::Relative),
+
+        OpCode::new(0x18, "CLC", 1, 2, AddressingMode::NoneAddressing),
+        OpCode::new(0xD8, "CLD", 1, 2, AddressingMode::NoneAddressing),
+        OpCode::new(0x58, "CLI", 1, 2, AddressingMode::NoneAddressing),
+        OpCode::new(0xB8, "CLV", 1, 2, AddressingMode::NoneAddressing),
+
     ];
 
     pub static ref OPCODES_MAP: HashMap<u8, &'static OpCode> = {

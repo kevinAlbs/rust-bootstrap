@@ -340,6 +340,52 @@ impl CPU {
                     }
                     self.program_counter += opcode.bytes - 1;
                 }
+                "BMI" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    if self.status & CPU::NEGATIVE_FLAG == CPU::NEGATIVE_FLAG {
+                        self.program_counter = addr;
+                    } else {
+                        self.program_counter += opcode.bytes - 1;
+                    }
+                }
+                "BPL" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    if self.status & CPU::NEGATIVE_FLAG == CPU::NEGATIVE_FLAG {
+                        // negative. Do not jump.
+                        self.program_counter += opcode.bytes - 1;
+                    } else {
+                        self.program_counter = addr;
+                    }
+                }
+                "BVC" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    if self.status & CPU::OVERFLOW_FLAG == CPU::OVERFLOW_FLAG {
+                        // Overflow set. Do not jump.
+                        self.program_counter += opcode.bytes - 1;
+                    } else {
+                        self.program_counter = addr;
+                    }
+                }
+                "BVS" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    if self.status & CPU::OVERFLOW_FLAG == CPU::OVERFLOW_FLAG {
+                        self.program_counter = addr;
+                    } else {
+                        self.program_counter += opcode.bytes - 1;
+                    }
+                }
+                "CLC" => {
+                    self.status = self.status & !CPU::CARRY_FLAG;
+                }
+                "CLD" => {
+                    self.status = self.status & !CPU::DECIMAL_FLAG;
+                }
+                "CLI" => {
+                    self.status = self.status & !CPU::INTERRUPT_DISABLE_FLAG;
+                }
+                "CLV" => {
+                    self.status = self.status & !CPU::OVERFLOW_FLAG;
+                }
                 _ => {
                     todo!();
                 }
@@ -350,7 +396,9 @@ impl CPU {
     pub const ZERO_FLAG: u8 = 0b0000_0010;
     pub const NEGATIVE_FLAG: u8 = 0b1000_0000;
     pub const CARRY_FLAG: u8 = 0b0000_0001;
-    pub const OVERFLOW_FLAG: u8 = 0b01000000;
+    pub const OVERFLOW_FLAG: u8 = 0b0100_0000;
+    pub const DECIMAL_FLAG: u8 = 0b0000_1000;
+    pub const INTERRUPT_DISABLE_FLAG: u8 = 0b0000_0100;
 
     fn set_zero_and_negative_flags(&mut self, val: u8) {
         if val == 0 {
@@ -998,5 +1046,172 @@ mod test {
             assert_eq!(cpu.status & CPU::NEGATIVE_FLAG, CPU::NEGATIVE_FLAG);
             assert_eq!(cpu.status & CPU::OVERFLOW_FLAG, CPU::OVERFLOW_FLAG);
         }
+    }
+
+    #[test]
+    fn test_0x30_bmi() {
+        let mut cpu = CPU::new();
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x30, 0x01, // Jump one instruction ahead.
+                0xFF, // Invalid instruction.
+                0xA9, 123, 0x00, // LDA value 123.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.status = CPU::NEGATIVE_FLAG;
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+        }
+        // Does not jump if negative not set.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x30, 0x01, // Jump one instruction ahead.
+                0x00, // Break.
+                0xA9, 123, 0x00, // LDA value 123.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0);
+        }
+    }
+
+    #[test]
+    fn test_0x10_bpl() {
+        let mut cpu = CPU::new();
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x10, 0x01, // Jump one instruction ahead.
+                0xFF, // Invalid instruction.
+                0xA9, 123, 0x00, // LDA value 123.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.status = 0;
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+        }
+        // Does not jump if negative set.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x10, 0x01, // Jump one instruction ahead.
+                0x00, // Break.
+                0xA9, 123, 0x00, // LDA value 123.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.status = CPU::NEGATIVE_FLAG;
+            cpu.run();
+            assert_eq!(cpu.register_a, 0);
+        }
+    }
+
+    #[test]
+    fn test_0x50_bvc() {
+        let mut cpu = CPU::new();
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x50, 0x01, // Jump one instruction ahead.
+                0xFF, // Invalid instruction.
+                0xA9, 123, 0x00, // LDA value 123.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.status = 0;
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+        }
+        // Does not jump if overflow set.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x50, 0x01, // Jump one instruction ahead.
+                0x00, // Break.
+                0xA9, 123, 0x00, // LDA value 123.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.status = CPU::OVERFLOW_FLAG;
+            cpu.run();
+            assert_eq!(cpu.register_a, 0);
+        }
+    }
+
+    #[test]
+    fn test_0x70_bvs() {
+        let mut cpu = CPU::new();
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x70, 0x01, // Jump one instruction ahead.
+                0xFF, // Invalid instruction.
+                0xA9, 123, 0x00, // LDA value 123.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.status = CPU::OVERFLOW_FLAG;
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+        }
+        // Does not jump if overflow not set.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x70, 0x01, // Jump one instruction ahead.
+                0x00, // Break.
+                0xA9, 123, 0x00, // LDA value 123.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.status = 0;
+            cpu.run();
+            assert_eq!(cpu.register_a, 0);
+        }
+    }
+
+    #[test]
+    fn test_0x18_clc() {
+        let mut cpu = CPU::new();
+
+        cpu.reset();
+        cpu.load(vec![0x18, 0x00]);
+        cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+        cpu.status = 0xFF; // Everything set.
+        cpu.run();
+        assert_eq!(cpu.status, 0xFF & !(CPU::CARRY_FLAG));
+    }
+
+    #[test]
+    fn test_0xd8_cld() {
+        let mut cpu = CPU::new();
+
+        cpu.reset();
+        cpu.load(vec![0xd8, 0x00]);
+        cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+        cpu.status = 0xFF; // Everything set.
+        cpu.run();
+        assert_eq!(cpu.status, 0xFF & !(CPU::DECIMAL_FLAG));
+    }
+
+    #[test]
+    fn test_0x58_cli() {
+        let mut cpu = CPU::new();
+
+        cpu.reset();
+        cpu.load(vec![0x58, 0x00]);
+        cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+        cpu.status = 0xFF; // Everything set.
+        cpu.run();
+        assert_eq!(cpu.status, 0xFF & !(CPU::INTERRUPT_DISABLE_FLAG));
+    }
+
+    #[test]
+    fn test_0xb8_clv() {
+        let mut cpu = CPU::new();
+
+        cpu.reset();
+        cpu.load(vec![0xb8, 0x00]);
+        cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+        cpu.status = 0xFF; // Everything set.
+        cpu.run();
+        assert_eq!(cpu.status, 0xFF & !(CPU::OVERFLOW_FLAG));
     }
 }
