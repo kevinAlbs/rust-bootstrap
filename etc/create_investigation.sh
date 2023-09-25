@@ -128,6 +128,7 @@ cat <<EOF >> investigations/$NAME/Cargo.toml
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.0", features = ["full"] }
 futures = "0.3"
+util = { path = "../../util" }
 [dependencies.mongodb]
 version = "2.6.0"
 features = ["tokio-runtime"]
