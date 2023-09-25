@@ -70,7 +70,16 @@ println! ("as_i32={:?}, as_f64={:?}", as_i32, as_f64);
 
 # Rust Driver Q&A
 
-## Q2: Does `Cursor.try_next` return None if `getMore` is still in flight?
+# Q3: Is it preferable to reference `bson` crate directly, or through `mongodb`?
+Example:
+```rust
+use bson::Document;
+// vs.
+use mongodb::bson::Document;
+```
+A: (Open)
+
+# Q2: Does `Cursor.try_next` return None if `getMore` is still in flight?
 A: No? Blocking `getMore` with a failpoint results in this loop returning all documents:
 ```rust
 while let Some(book) = cursor.try_next().await? {
@@ -80,3 +89,4 @@ while let Some(book) = cursor.try_next().await? {
 
 ## Q1: Is `collection.find()` lazy?
 A: No. `collection.find()` sends the "find" command on invocation. This differs from C driver. C driver does not send "find" command until the first iteration of the returned cursor.
+
