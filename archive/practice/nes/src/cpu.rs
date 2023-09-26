@@ -376,15 +376,19 @@ impl CPU {
                 }
                 "CLC" => {
                     self.status = self.status & !CPU::CARRY_FLAG;
+                    self.program_counter += opcode.bytes - 1;
                 }
                 "CLD" => {
                     self.status = self.status & !CPU::DECIMAL_FLAG;
+                    self.program_counter += opcode.bytes - 1;
                 }
                 "CLI" => {
                     self.status = self.status & !CPU::INTERRUPT_DISABLE_FLAG;
+                    self.program_counter += opcode.bytes - 1;
                 }
                 "CLV" => {
                     self.status = self.status & !CPU::OVERFLOW_FLAG;
+                    self.program_counter += opcode.bytes - 1;
                 }
                 _ => {
                     todo!();
