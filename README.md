@@ -24,7 +24,26 @@ let path = {
 };
 ```
 
-# Q&A
+# Rust Q&A
+
+## Q3: How to get stdout for test?
+A: cargo test -- --show-output
+
+## Q2: How do I return an Error from multiple types?
+A: One option: use a result with a boxed `dyn Error`:
+`std::result::Result<T, Box<dyn std::error::Error>>`
+
+## Q1: What happens when `as` is used with out-of-range value?
+A: Casting f64 to i32 appears to cap value:
+```rust
+let as_f64 = 4294967297.0;
+let as_i32 = as_f64 as i32;
+println! ("as_i32={:?}, as_f64={:?}", as_i32, as_f64);
+// Prints:
+// as_i32=2147483647, as_f64=4294967297.0
+```
+
+# Rust Driver Q&A
 
 ## Q2: Does `Cursor.try_next` return None if `getMore` is still in flight?
 A: No? Blocking `getMore` with a failpoint results in this loop returning all documents:
