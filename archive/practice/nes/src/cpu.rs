@@ -810,7 +810,7 @@ mod test {
     }
 
     // AND operations with other AddressingMode values are not tested.
-    // Assuming testing ADC with all AddressingMode is sufficient.
+    // Assuming testing ADC with Immediate AddressingMode is sufficient.
 
     #[test]
     fn test_0x0a_asl_immediate() {
