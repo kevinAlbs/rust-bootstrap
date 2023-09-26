@@ -390,6 +390,84 @@ impl CPU {
                     self.status = self.status & !CPU::OVERFLOW_FLAG;
                     self.program_counter += opcode.bytes - 1;
                 }
+                "CMP" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    let val = self.mem_read(addr);
+                    if self.trace {
+                        println!("  CMP A={} with M={}", self.register_a, val);
+                    }
+                    if self.register_a >= val {
+                        self.status = self.status | CPU::CARRY_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::CARRY_FLAG;
+                    }
+
+                    if self.register_a == val {
+                        self.status = self.status | CPU::ZERO_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::ZERO_FLAG;
+                    }
+
+                    if self.register_a < val {
+                        self.status = self.status | CPU::NEGATIVE_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::NEGATIVE_FLAG;
+                    }
+                    self.program_counter += opcode.bytes - 1;
+                }
+
+                "CPX" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    let val = self.mem_read(addr);
+                    if self.trace {
+                        println!("  CMP X={} with M={}", self.register_x, val);
+                    }
+                    if self.register_x >= val {
+                        self.status = self.status | CPU::CARRY_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::CARRY_FLAG;
+                    }
+
+                    if self.register_x == val {
+                        self.status = self.status | CPU::ZERO_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::ZERO_FLAG;
+                    }
+
+                    if self.register_x < val {
+                        self.status = self.status | CPU::NEGATIVE_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::NEGATIVE_FLAG;
+                    }
+                    self.program_counter += opcode.bytes - 1;
+                }
+
+                "CPY" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    let val = self.mem_read(addr);
+                    if self.trace {
+                        println!("  CMP Y={} with M={}", self.register_y, val);
+                    }
+                    if self.register_y >= val {
+                        self.status = self.status | CPU::CARRY_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::CARRY_FLAG;
+                    }
+
+                    if self.register_y == val {
+                        self.status = self.status | CPU::ZERO_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::ZERO_FLAG;
+                    }
+
+                    if self.register_y < val {
+                        self.status = self.status | CPU::NEGATIVE_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::NEGATIVE_FLAG;
+                    }
+                    self.program_counter += opcode.bytes - 1;
+                }
+
                 _ => {
                     todo!();
                 }
@@ -1218,4 +1296,136 @@ mod test {
         cpu.run();
         assert_eq!(cpu.status, 0xFF & !(CPU::OVERFLOW_FLAG));
     }
+
+    #[test]
+    fn test_cmp() {
+        let mut cpu = CPU::new();
+
+        // A > M
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xa9, 0x02, // LDA Immediate of 2.
+                0xc9, 0x01, // CMP with 1.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::CARRY_FLAG);
+        }
+
+        // A == M
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xa9, 0x01, // LDA Immediate of 1.
+                0xc9, 0x01, // CMP with 1.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::CARRY_FLAG | CPU::ZERO_FLAG);
+        }
+
+        // A < M
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xa9, 0x01, // LDA Immediate of 1.
+                0xc9, 0x02, // CMP with 2.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
+        }
+    }
+
+    // CMP operations with other AddressingMode values are not tested.
+    // Assuming testing CMP with Immediate AddressingMode is sufficient.
+
+    #[test]
+    fn test_cpx() {
+        let mut cpu = CPU::new();
+
+        // X > M
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xe0, 0x01, // CMP with 1.
+            ]);
+            cpu.register_x = 2;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::CARRY_FLAG);
+        }
+
+        // X == M
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xe0, 0x01, // CMP with 1.
+            ]);
+            cpu.register_x = 1;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::CARRY_FLAG | CPU::ZERO_FLAG);
+        }
+
+        // X < M
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xc9, 0x02, // CMP with 2.
+            ]);
+            cpu.register_x = 1;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
+        }
+    }
+
+    // CPX operations with other AddressingMode values are not tested.
+    // Assuming testing CPX with Immediate AddressingMode is sufficient.
+
+    #[test]
+    fn test_cpy() {
+        let mut cpu = CPU::new();
+
+        // Y > M
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xc0, 0x01, // CMP with 1.
+            ]);
+            cpu.register_y = 2;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::CARRY_FLAG);
+        }
+
+        // Y == M
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xc0, 0x01, // CMP with 1.
+            ]);
+            cpu.register_y = 1;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::CARRY_FLAG | CPU::ZERO_FLAG);
+        }
+
+        // Y < M
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xc0, 0x02, // CMP with 2.
+            ]);
+            cpu.register_y = 1;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
+        }
+    }
+
+    // CPY operations with other AddressingMode values are not tested.
+    // Assuming testing CPY with Immediate AddressingMode is sufficient.
 }
