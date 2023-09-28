@@ -200,12 +200,6 @@ impl CPU {
                     self.register_x = self.register_a;
                     self.set_zero_and_negative_flags(self.register_x);
                 }
-                "INX" => {
-                    // Increment X.
-                    // Use `wrapping_add`. Overflow with `+` results in panic.
-                    self.register_x = self.register_x.wrapping_add(1);
-                    self.set_zero_and_negative_flags(self.register_x)
-                }
                 "BRK" => {
                     // Break.
                     return;
@@ -520,11 +514,29 @@ impl CPU {
                         println!("  INC M={}", m);
                     }
                     m = m.wrapping_add(1);
-                    if self.trace {
-                        println!("  After M={}", m);
-                    }
                     self.set_zero_and_negative_flags(m);
                     self.mem_write(addr, m);
+                    self.program_counter += opcode.bytes - 1;
+                }
+
+                "INX" => {
+                    let mut x = self.register_x;
+                    if self.trace {
+                        println!("  INC X={}", x);
+                    }
+                    x = x.wrapping_add(1);
+                    self.set_zero_and_negative_flags(x);
+                    self.register_x = x;
+                    self.program_counter += opcode.bytes - 1;
+                }
+                "INY" => {
+                    let mut y = self.register_y;
+                    if self.trace {
+                        println!("  INC Y={}", y);
+                    }
+                    y = y.wrapping_add(1);
+                    self.set_zero_and_negative_flags(y);
+                    self.register_y = y;
                     self.program_counter += opcode.bytes - 1;
                 }
 
@@ -1719,4 +1731,76 @@ mod test {
 
     // INC operations with other AddressingMode values are not tested.
     // Assuming testing INC with Immediate AddressingMode is sufficient.
+
+    #[test]
+    fn test_0xe8_inx() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            cpu.load(vec![0xe8]);
+            cpu.register_x = 123;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, 0);
+            assert_eq!(cpu.register_x, 124);
+        }
+
+        // Test zero flag is set.
+        {
+            cpu.reset();
+            cpu.load(vec![0xe8]);
+            cpu.register_x = 255;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::ZERO_FLAG);
+            assert_eq!(cpu.register_x, 0);
+        }
+        // Test negative flag is set.
+        {
+            cpu.reset();
+            cpu.load(vec![0xe8]);
+            cpu.register_x = 0b0111_1111;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
+            assert_eq!(cpu.register_x, 0b1000_0000);
+        }
+    }
+
+    #[test]
+    fn test_0xc8_iny() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            cpu.load(vec![0xc8]);
+            cpu.register_y = 123;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, 0);
+            assert_eq!(cpu.register_y, 124);
+        }
+
+        // Test zero flag is set.
+        {
+            cpu.reset();
+            cpu.load(vec![0xc8]);
+            cpu.register_y = 255;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::ZERO_FLAG);
+            assert_eq!(cpu.register_y, 0);
+        }
+        // Test negative flag is set.
+        {
+            cpu.reset();
+            cpu.load(vec![0xc8]);
+            cpu.register_y = 0b0111_1111;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
+            assert_eq!(cpu.register_y, 0b1000_0000);
+        }
+    }
 }

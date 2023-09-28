@@ -117,8 +117,8 @@ lazy_static! {
         OpCode::new(0xCE, "DEC", 3, 6, AddressingMode::Absolute),
         OpCode::new(0xDE, "DEC", 3, 7, AddressingMode::Absolute_X),
 
-        OpCode::new(0xCA, "DEX", 1, 7, AddressingMode::NoneAddressing),
-        OpCode::new(0x88, "DEY", 1, 7, AddressingMode::NoneAddressing),
+        OpCode::new(0xCA, "DEX", 1, 2, AddressingMode::NoneAddressing),
+        OpCode::new(0x88, "DEY", 1, 2, AddressingMode::NoneAddressing),
 
         OpCode::new(0x49, "EOR", 2, 2, AddressingMode::Immediate),
         OpCode::new(0x45, "EOR", 2, 3, AddressingMode::ZeroPage),
@@ -133,6 +133,9 @@ lazy_static! {
         OpCode::new(0xF6, "INC", 2, 6, AddressingMode::ZeroPage_X),
         OpCode::new(0xEE, "INC", 3, 6, AddressingMode::Absolute),
         OpCode::new(0xFE, "INC", 3, 7, AddressingMode::Absolute_X),
+
+        OpCode::new(0xE8, "INX", 1, 2, AddressingMode::NoneAddressing),
+        OpCode::new(0xC8, "INY", 1, 2, AddressingMode::NoneAddressing),
     ];
 
     pub static ref OPCODES_MAP: HashMap<u8, &'static OpCode> = {
