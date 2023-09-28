@@ -1502,7 +1502,6 @@ mod test {
                 0x85, 0x01, // STA at address 0x0001.
                 0xc6, 0x01, // DEC.
             ]);
-            cpu.register_y = 1;
             cpu.program_counter = cpu.mem_read_u16(0xFFFC);
             cpu.run();
             assert_eq!(cpu.status, 0);
@@ -1518,7 +1517,6 @@ mod test {
                 0x85, 0x01, // STA at address 0x0001.
                 0xc6, 0x01, // DEC.
             ]);
-            cpu.register_y = 1;
             cpu.program_counter = cpu.mem_read_u16(0xFFFC);
             cpu.run();
             assert_eq!(cpu.status, CPU::ZERO_FLAG);
@@ -1534,7 +1532,6 @@ mod test {
                 0x85, 0x01, // STA at address 0x0001.
                 0xc6, 0x01, // DEC.
             ]);
-            cpu.register_y = 1;
             cpu.program_counter = cpu.mem_read_u16(0xFFFC);
             cpu.run();
             assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
