@@ -474,18 +474,8 @@ impl CPU {
                     if self.trace {
                         println!("  DEC M={}", m);
                     }
-                    if m == 0 {
-                        self.status = self.status | CPU::NEGATIVE_FLAG;
-                    } else {
-                        self.status = self.status & !CPU::NEGATIVE_FLAG;
-                    }
-
-                    if m == 1 {
-                        self.status = self.status | CPU::ZERO_FLAG;
-                    } else {
-                        self.status = self.status & !CPU::ZERO_FLAG;
-                    }
                     m = m.wrapping_sub(1);
+                    self.set_zero_and_negative_flags(m);
                     self.mem_write(addr, m);
                     self.program_counter += opcode.bytes - 1;
                 }
@@ -495,18 +485,8 @@ impl CPU {
                     if self.trace {
                         println!("  DEC X={}", x);
                     }
-                    if x == 0 {
-                        self.status = self.status | CPU::NEGATIVE_FLAG;
-                    } else {
-                        self.status = self.status & !CPU::NEGATIVE_FLAG;
-                    }
-
-                    if x == 1 {
-                        self.status = self.status | CPU::ZERO_FLAG;
-                    } else {
-                        self.status = self.status & !CPU::ZERO_FLAG;
-                    }
                     x = x.wrapping_sub(1);
+                    self.set_zero_and_negative_flags(x);
                     self.register_x = x;
                     self.program_counter += opcode.bytes - 1;
                 }
@@ -515,21 +495,39 @@ impl CPU {
                     if self.trace {
                         println!("  DEC Y={}", y);
                     }
-                    if y == 0 {
-                        self.status = self.status | CPU::NEGATIVE_FLAG;
-                    } else {
-                        self.status = self.status & !CPU::NEGATIVE_FLAG;
-                    }
-
-                    if y == 1 {
-                        self.status = self.status | CPU::ZERO_FLAG;
-                    } else {
-                        self.status = self.status & !CPU::ZERO_FLAG;
-                    }
                     y = y.wrapping_sub(1);
+                    self.set_zero_and_negative_flags(y);
                     self.register_y = y;
                     self.program_counter += opcode.bytes - 1;
                 }
+
+                "EOR" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    let m = self.mem_read(addr);
+                    if self.trace {
+                        println!("  EOR M={}", m);
+                    }
+
+                    self.register_a = m ^ self.register_a;
+                    self.set_zero_and_negative_flags(self.register_a);
+                    self.program_counter += opcode.bytes - 1;
+                }
+
+                "INC" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    let mut m = self.mem_read(addr);
+                    if self.trace {
+                        println!("  INC M={}", m);
+                    }
+                    m = m.wrapping_add(1);
+                    if self.trace {
+                        println!("  After M={}", m);
+                    }
+                    self.set_zero_and_negative_flags(m);
+                    self.mem_write(addr, m);
+                    self.program_counter += opcode.bytes - 1;
+                }
+
                 _ => {
                     todo!();
                 }
@@ -1614,4 +1612,111 @@ mod test {
             assert_eq!(cpu.register_y, 255);
         }
     }
+
+    #[test]
+    fn test_0x49_eor() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xa9,
+                0b0000_0011, // LDA.
+                0x49,
+                0b0000_0101, // XOR.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, 0);
+            assert_eq!(cpu.register_a, 0b0000_0110);
+        }
+
+        // Sets zero flag.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xa9,
+                0b0000_0011, // LDA.
+                0x49,
+                0b0000_0011, // XOR.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::ZERO_FLAG);
+            assert_eq!(cpu.register_a, 0b0000_0000);
+        }
+
+        // Sets negative flag.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xa9,
+                0b1000_0000, // LDA.
+                0x49,
+                0b0000_0000, // XOR.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
+            assert_eq!(cpu.register_a, 0b1000_0000);
+        }
+    }
+    // EOR operations with other AddressingMode values are not tested.
+    // Assuming testing EOR with Immediate AddressingMode is sufficient.
+
+    #[test]
+    fn test_0xe6_inc() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xA9, 123, // LDA 123.
+                0x85, 0x01, // STA at address 0x0001.
+                0xe6, 0x01, // INC.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, 0);
+            let got = cpu.mem_read(0x0001);
+            assert_eq!(got, 124);
+        }
+
+        // Test zero flag is set.
+        {
+            cpu.reset();
+            cpu.trace = true;
+            cpu.load(vec![
+                0xA9, 255, // LDA 1.
+                0x85, 0x01, // STA at address 0x0001.
+                0xe6, 0x01, // INC.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::ZERO_FLAG);
+            let got = cpu.mem_read(0x0001);
+            assert_eq!(got, 0);
+        }
+
+        // Test negative flag is set.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xA9,
+                0b0111_1111, // LDA 0.
+                0x85,
+                0x01, // STA at address 0x0001.
+                0xe6,
+                0x01, // INC.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
+            let got = cpu.mem_read(0x0001);
+            assert_eq!(got, 0b1000_0000);
+        }
+    }
+
+    // INC operations with other AddressingMode values are not tested.
+    // Assuming testing INC with Immediate AddressingMode is sufficient.
 }
