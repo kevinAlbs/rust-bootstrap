@@ -4,11 +4,20 @@ pub struct CPU {
     pub register_a: u8,
     pub register_x: u8,
     pub register_y: u8,
+    // stack_pointer is the offset of the address of the stack.
+    // The stack starts at address `STACK` + `stack_pointer` and grows downward.
+    pub stack_pointer: u8,
     pub status: u8,
     pub program_counter: u16,
     memory: [u8; 0xFFFF],
     trace: bool,
 }
+
+// STACK is the starting address of the stack.
+const STACK: u16 = 0x0100;
+// STACK_RESET is the initial value of `stack_pointer`.
+// I expect STACK_RESET could be 0xFF. https://github.com/bugzmanov/nes_ebook/blob/master/code/ch3.3/src/cpu.rs#L346 shows STACK_RESET as 0xFD.
+const STACK_RESET: u8 = 0xFD;
 
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
@@ -33,6 +42,8 @@ impl CPU {
             register_a: 0,
             register_x: 0,
             register_y: 0,
+            // stack_pointer is the stack pointer.
+            stack_pointer: STACK_RESET,
             status: 0,
             program_counter: 0,
             memory: [0; 0xFFFF],
@@ -42,6 +53,37 @@ impl CPU {
 
     pub fn set_trace_mode(&mut self, val: bool) {
         self.trace = val;
+    }
+
+    pub fn stack_push(&mut self, val: u8) {
+        if self.stack_pointer == 0 {
+            panic!("stack overflow: attempting to push when stack_pointer == 0x00");
+        }
+        let addr = STACK.wrapping_add(self.stack_pointer as u16);
+        self.mem_write(addr, val);
+        self.stack_pointer -= 1;
+    }
+
+    pub fn stack_pop(&mut self) -> u8 {
+        if self.stack_pointer == 0xFF {
+            panic!("stack underflow: attempting to pop when stack_pointer == 0xFF");
+        }
+        self.stack_pointer += 1;
+        let addr = STACK.wrapping_add(self.stack_pointer as u16);
+        return self.mem_read(addr);
+    }
+
+    pub fn stack_push_u16(&mut self, val: u16) {
+        let hi = (val >> 8) as u8;
+        let lo = val as u8;
+        self.stack_push(hi);
+        self.stack_push(lo);
+    }
+
+    pub fn stack_pop_u16(&mut self) -> u16 {
+        let lo = self.stack_pop() as u16;
+        let hi = self.stack_pop() as u16;
+        return (hi << 8) | lo;
     }
 
     fn get_operand_address(&self, mode: &AddressingMode) -> u16 {
@@ -145,6 +187,7 @@ impl CPU {
         self.register_x = 0;
         self.status = 0;
         self.program_counter = self.mem_read_u16(0xFFFC);
+        self.stack_pointer = STACK_RESET;
     }
 
     pub fn load(&mut self, program: Vec<u8>) {
@@ -538,6 +581,16 @@ impl CPU {
                     self.set_zero_and_negative_flags(y);
                     self.register_y = y;
                     self.program_counter += opcode.bytes - 1;
+                }
+
+                "JSR" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    if self.trace {
+                        println!("  JSR to {}", addr);
+                    }
+                    let ret = self.program_counter + opcode.bytes - 1;
+                    self.stack_push_u16(ret);
+                    self.program_counter = addr;
                 }
 
                 _ => {
@@ -1801,6 +1854,50 @@ mod test {
             cpu.run();
             assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
             assert_eq!(cpu.register_y, 0b1000_0000);
+        }
+    }
+
+    #[test]
+    fn test_push_pop() {
+        let mut cpu = CPU::new();
+
+        // Test push / pop of u8.
+        {
+            cpu.reset();
+            cpu.stack_push(1);
+            cpu.stack_push(2);
+            assert_eq!(cpu.stack_pop(), 2);
+            assert_eq!(cpu.stack_pop(), 1);
+        }
+        // Q: is it possible to assert something panics?
+        // A:
+        {
+            // Test push / pop of u16.
+            cpu.stack_push_u16(0x1234);
+            cpu.stack_push_u16(0xABCD);
+            assert_eq!(cpu.stack_pop_u16(), 0xABCD);
+            assert_eq!(cpu.stack_pop_u16(), 0x1234);
+        }
+    }
+
+    #[test]
+    fn test_0x20_jsr() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            // 0x8000 is starting address of instructions.
+            cpu.load(vec![
+                0x20, 0x04, 0x80, // JSR to 0x8004
+                0xFF, // Invalid instruction.
+                0xa9, 123, // LDA 123.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+            let got = cpu.stack_pop_u16();
+            let expect = 0x8003;
+            assert_eq!(got, expect, "testing {:02x} and {:02x}", got, expect);
         }
     }
 }
