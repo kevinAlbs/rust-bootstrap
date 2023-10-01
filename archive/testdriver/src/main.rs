@@ -6,6 +6,16 @@ use mongodb::options::ClientOptions;
 use mongodb::sync::Client;
 use std::sync::Arc;
 
+use mongodb::bson;
+use mongodb::bson::doc;
+use mongodb::bson::Document;
+use mongodb::sync::Collection;
+
+use serde::Serialize;
+
+// This trait is required to use `try_next()` on the cursor
+use futures::stream::TryStreamExt;
+
 struct CommandHandlerDumper {}
 
 impl CommandEventHandler for CommandHandlerDumper {
@@ -28,6 +38,11 @@ impl CommandEventHandler for CommandHandlerDumper {
     }
 }
 
+#[derive(Serialize)]
+struct Foo {
+    field: i32,
+}
+
 fn main() -> Result<()> {
     // Parse a connection string into an options struct.
     let mut client_options = ClientOptions::parse("mongodb://localhost:27017")?;
@@ -44,5 +59,6 @@ fn main() -> Result<()> {
     for db_name in client.list_database_names(None, None)? {
         println!("{}", db_name);
     }
+
     Ok(())
 }

@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies.mongodb]
-version = "2.5.0"
-features = ["tokio-sync"]
+version = "2.6.0"
+features = ["zstd-compression", "zlib-compression", "snappy-compression" ]
 # default-features = false
 
 [dependencies.serde]
@@ -16,6 +16,7 @@ version = "1.0.125"
 
 [dependencies]
 serde_json = "1.0"
+tokio = "1.0"
 
 # In Cargo.toml, add the following dependency.
 futures = "0.3"
