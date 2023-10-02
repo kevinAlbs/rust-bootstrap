@@ -1,3 +1,8 @@
+https://www.nesdev.org/obelisk-6502-guide/reference.html#LSR
+Under `LSR`:
+> N	Negative Flag	Set if bit 7 of the result is set
+I expect Negative Flag is never set.
+
 I expect STACK_RESET could be 0xFF. https://github.com/bugzmanov/nes_ebook/blob/master/code/ch3.3/src/cpu.rs#L346 shows STACK_RESET as 0xFD.
 
 https://www.nesdev.org/obelisk-6502-guide/reference.html#ASL

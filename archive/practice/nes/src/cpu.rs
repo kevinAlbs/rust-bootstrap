@@ -22,6 +22,7 @@ const STACK_RESET: u8 = 0xFD;
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
 pub enum AddressingMode {
+    Accumulator,
     Immediate,
     ZeroPage,
     ZeroPage_X,
@@ -143,7 +144,7 @@ impl CPU {
                 base = base.wrapping_add(1);
                 base
             }
-            AddressingMode::NoneAddressing => {
+            AddressingMode::NoneAddressing | AddressingMode::Accumulator => {
                 panic!("mode {:?} is not supported", mode);
             }
         }
@@ -154,6 +155,20 @@ impl CPU {
         let value = self.mem_read(addr);
         self.register_a = value;
         self.set_zero_and_negative_flags(self.register_a);
+    }
+
+    fn ldx(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+        self.register_x = value;
+        self.set_zero_and_negative_flags(self.register_x);
+    }
+
+    fn ldy(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+        self.register_y = value;
+        self.set_zero_and_negative_flags(self.register_y);
     }
 
     fn sta(&mut self, mode: &AddressingMode) {
@@ -593,6 +608,52 @@ impl CPU {
                     self.program_counter = addr;
                 }
 
+                "LDX" => {
+                    self.ldx(&opcode.mode);
+                    self.program_counter += opcode.bytes - 1;
+                }
+
+                "LDY" => {
+                    self.ldy(&opcode.mode);
+                    self.program_counter += opcode.bytes - 1;
+                }
+                "LSR" => {
+                    let mut value;
+                    let addr;
+                    match opcode.mode {
+                        AddressingMode::Accumulator => {
+                            value = self.register_a;
+                            addr = 0xFFFF;
+                        }
+                        _ => {
+                            addr = self.get_operand_address(&opcode.mode);
+                            value = self.mem_read(addr);
+                        }
+                    }
+
+                    println!("Shifting value {value} one bit");
+                    if value & 1 == 1 {
+                        // Set carry.
+                        self.status = self.status | CPU::CARRY_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::CARRY_FLAG;
+                    }
+
+                    value >>= 1;
+
+                    self.set_zero_and_negative_flags(value);
+
+                    match opcode.mode {
+                        AddressingMode::Accumulator => {
+                            self.register_a = value;
+                        }
+                        _ => {
+                            self.mem_write(addr, value);
+                        }
+                    }
+
+                    self.program_counter += opcode.bytes - 1;
+                }
                 _ => {
                     todo!();
                 }
@@ -1900,4 +1961,89 @@ mod test {
             assert_eq!(got, expect, "testing {:02x} and {:02x}", got, expect);
         }
     }
+
+    #[test]
+    fn test_0xa2_ldx() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            cpu.load(vec![0xa2, 123]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_x, 123);
+            assert_eq!(cpu.status, 0);
+        }
+    }
+
+    // LDX operations with other AddressingMode values are not tested.
+    // Assuming testing LDX with Immediate AddressingMode is sufficient.
+
+    #[test]
+    fn test_0xa0_ldy() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            cpu.load(vec![0xa0, 123]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_y, 123);
+            assert_eq!(cpu.status, 0);
+        }
+    }
+
+    // LDY operations with other AddressingMode values are not tested.
+    // Assuming testing LDY with Immediate AddressingMode is sufficient.
+
+    #[test]
+    fn test_0x4a_lsr() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xA9, 0b10, // LDA
+                0x4A,
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b01);
+            assert_eq!(cpu.status, 0);
+        }
+
+        // Check zero flag.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xA9, 0b01, // LDA
+                0x4A,
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b00);
+            assert_eq!(cpu.status, CPU::ZERO_FLAG | CPU::CARRY_FLAG);
+        }
+    }
+
+    #[test]
+    fn test_0x46_lsr() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xA9, 0b10, // LDA
+                0x85, 0x02, // STA ZeroPage
+                0x46, 0x02, // LSR
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.mem_read(0x0002), 0b01);
+            assert_eq!(cpu.status, 0);
+        }
+    }
+
+    // LSR operations with other AddressingMode values are not tested.
+    // Assuming testing LSR with Accumulator and ZeroPage AddressingMode is sufficient.
 }
