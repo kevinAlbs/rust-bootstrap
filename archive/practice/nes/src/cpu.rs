@@ -654,6 +654,29 @@ impl CPU {
 
                     self.program_counter += opcode.bytes - 1;
                 }
+                "NOP" => {
+                    self.program_counter += opcode.bytes - 1;
+                }
+
+                "ORA" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    let value = self.mem_read(addr);
+                    if self.trace {
+                        println!(
+                            "  ORA with value: 0b{:08b}. Register A is: 0b{:08b}",
+                            value, self.register_a
+                        );
+                    }
+
+                    self.register_a = self.register_a | value;
+                    self.set_zero_and_negative_flags(self.register_a);
+                    self.program_counter += opcode.bytes - 1;
+                }
+
+                "PHA" => {
+                    self.stack_push(self.register_a);
+                    self.program_counter += opcode.bytes - 1;
+                }
                 _ => {
                     todo!();
                 }
@@ -2046,4 +2069,78 @@ mod test {
 
     // LSR operations with other AddressingMode values are not tested.
     // Assuming testing LSR with Accumulator and ZeroPage AddressingMode is sufficient.
+
+    #[test]
+    fn test_0xea_nop() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            cpu.load(vec![0xEA]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, 0);
+        }
+    }
+
+    #[test]
+    fn test_0x09_ora_immediate() {
+        let mut cpu = CPU::new();
+        // OR 1001 and 1101
+        {
+            cpu.reset();
+            cpu.load(vec![0x09, 0b1101]);
+            cpu.register_a = 0b1001;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b1101);
+        }
+
+        // Check that negative flag is set.
+        {
+            cpu.reset();
+            cpu.load(vec![0x09, 0b1000_0000]);
+            cpu.register_a = 0b0000_0000;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b1000_0000);
+            // Check that negative flag is set.
+            assert!(cpu.status == CPU::NEGATIVE_FLAG);
+        }
+
+        // Check that zero flag is set.
+        {
+            cpu.reset();
+            cpu.load(vec![0x09, 0b0]);
+            cpu.register_a = 0b0;
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b0);
+            // Check that zero flag is set.
+            assert!(cpu.status == CPU::ZERO_FLAG);
+        }
+    }
+
+    // ORA operations with other AddressingMode values are not tested.
+    // Assuming testing ORA with Immediate AddressingMode is sufficient.
+
+    #[test]
+    fn test_0x48_pha() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            // 0x8000 is starting address of instructions.
+            cpu.load(vec![
+                0xa9, 123,  // LDA Immediate
+                0x48, // PHA
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+            let got = cpu.stack_pop();
+            let expect = 123;
+            assert_eq!(got, expect);
+        }
+    }
 }
