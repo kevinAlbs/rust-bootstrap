@@ -200,6 +200,9 @@ impl CPU {
     pub fn reset(&mut self) {
         self.register_a = 0;
         self.register_x = 0;
+
+        // TODO: set ONE_FLAG and INTERRUPT_DISABLE?
+        // See: https://github.com/bugzmanov/nes_ebook/blob/c4f905346b27e3ab17277e9651d191ff310f480b/code/ch3.3/src/cpu.rs#L246
         self.status = 0;
         self.program_counter = self.mem_read_u16(0xFFFC);
         self.stack_pointer = STACK_RESET;
@@ -694,6 +697,42 @@ impl CPU {
                     // Remove the B flag. See https://github.com/bugzmanov/nes_ebook/blob/c4f905346b27e3ab17277e9651d191ff310f480b/code/ch3.3/src/cpu.rs#L480
                     val = val & !CPU::B_FLAG;
                     self.status = val;
+                    self.program_counter += opcode.bytes - 1;
+                }
+
+                "ROL" => {
+                    let mut val;
+                    let mut addr = 0;
+                    match &opcode.mode {
+                        AddressingMode::Accumulator => {
+                            val = self.register_a;
+                        }
+                        mode => {
+                            addr = self.get_operand_address(&mode);
+                            val = self.mem_read(addr);
+                        }
+                    }
+                    let bit7set = (val & 0b1000_0000) == 0b1000_0000;
+                    let has_old_carry = (self.status & CPU::CARRY_FLAG) == CPU::CARRY_FLAG;
+                    val <<= 1;
+                    if has_old_carry {
+                        val |= 0b1;
+                    }
+                    if bit7set {
+                        self.status = self.status | CPU::CARRY_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::CARRY_FLAG;
+                    }
+                    self.set_zero_and_negative_flags(val);
+
+                    match &opcode.mode {
+                        AddressingMode::Accumulator => {
+                            self.register_a = val;
+                        }
+                        _ => {
+                            self.mem_write(addr, val);
+                        }
+                    }
                     self.program_counter += opcode.bytes - 1;
                 }
                 _ => {
@@ -2222,4 +2261,54 @@ mod test {
             assert_eq!(cpu.status, CPU::ZERO_FLAG | CPU::ONE_FLAG);
         }
     }
+
+    #[test]
+    fn test_0x2a_rol() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xA9,
+                0b0000_0001, // LDA
+                0x2A,        // ROL
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b0000_0010);
+            assert_eq!(cpu.status, 0);
+        }
+
+        // Stores carry.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xA9,
+                0b1000_0001, // LDA
+                0x2A,        // ROL
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b0000_0010);
+            assert_eq!(cpu.status, CPU::CARRY_FLAG);
+        }
+
+        // Applies carry.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xA9,
+                0b1000_0001, // LDA
+                0x2A,        // ROL
+                0x2A,        // ROL
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b0000_0101);
+            assert_eq!(cpu.status, 0);
+        }
+    }
+
+    // LSR operations with other AddressingMode values are not tested.
+    // Assuming testing LSR with Accumulator and ZeroPage AddressingMode is sufficient.
 }
