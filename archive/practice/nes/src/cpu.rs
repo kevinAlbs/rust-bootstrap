@@ -677,6 +677,25 @@ impl CPU {
                     self.stack_push(self.register_a);
                     self.program_counter += opcode.bytes - 1;
                 }
+
+                "PHP" => {
+                    self.stack_push(self.status | CPU::B_FLAG | CPU::ONE_FLAG);
+                    self.program_counter += opcode.bytes - 1;
+                }
+
+                "PLA" => {
+                    self.register_a = self.stack_pop();
+                    self.set_zero_and_negative_flags(self.register_a);
+                    self.program_counter += opcode.bytes - 1;
+                }
+
+                "PLP" => {
+                    let mut val = self.stack_pop();
+                    // Remove the B flag. See https://github.com/bugzmanov/nes_ebook/blob/c4f905346b27e3ab17277e9651d191ff310f480b/code/ch3.3/src/cpu.rs#L480
+                    val = val & !CPU::B_FLAG;
+                    self.status = val;
+                    self.program_counter += opcode.bytes - 1;
+                }
                 _ => {
                     todo!();
                 }
@@ -690,6 +709,8 @@ impl CPU {
     pub const OVERFLOW_FLAG: u8 = 0b0100_0000;
     pub const DECIMAL_FLAG: u8 = 0b0000_1000;
     pub const INTERRUPT_DISABLE_FLAG: u8 = 0b0000_0100;
+    pub const ONE_FLAG: u8 = 0b0010_0000; // Always pushed as 1.
+    pub const B_FLAG: u8 = 0b0001_0000; // See https://www.nesdev.org/wiki/Status_flags#The_B_flag
 
     fn set_zero_and_negative_flags(&mut self, val: u8) {
         if val == 0 {
@@ -2141,6 +2162,64 @@ mod test {
             let got = cpu.stack_pop();
             let expect = 123;
             assert_eq!(got, expect);
+        }
+    }
+
+    #[test]
+    fn test_0x08_php() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            // 0x8000 is starting address of instructions.
+            cpu.load(vec![
+                0xa9, 0x00, // LDA Immediate (sets Zero Flag)
+                0x08, // PHP
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            let got = cpu.stack_pop();
+            let expect = CPU::ZERO_FLAG | CPU::B_FLAG | CPU::ONE_FLAG;
+            assert_eq!(got, expect);
+        }
+    }
+
+    #[test]
+    fn test_0x68_pla() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            // 0x8000 is starting address of instructions.
+            cpu.load(vec![
+                0xa9, 123,  // LDA Immediate
+                0x48, // PHA
+                0xa9, 124,  // LDA Immediate
+                0x68, // PLA
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 123);
+            assert_eq!(cpu.status, 0)
+        }
+    }
+
+    #[test]
+    fn test_0x28_plp() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            // 0x8000 is starting address of instructions.
+            cpu.load(vec![
+                0xa9, 0x00, // LDA Immediate (sets Zero Flag)
+                0x08, // PHP
+                0xa9, 0x01, // Unsets the zero flag.
+                0x28, // PLP
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.status, CPU::ZERO_FLAG | CPU::ONE_FLAG);
         }
     }
 }
