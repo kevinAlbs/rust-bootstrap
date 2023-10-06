@@ -735,6 +735,49 @@ impl CPU {
                     }
                     self.program_counter += opcode.bytes - 1;
                 }
+
+                "ROR" => {
+                    let mut val;
+                    let mut addr = 0;
+                    match &opcode.mode {
+                        AddressingMode::Accumulator => {
+                            val = self.register_a;
+                        }
+                        mode => {
+                            addr = self.get_operand_address(&mode);
+                            val = self.mem_read(addr);
+                        }
+                    }
+                    let bit0set = (val & 0b0000_0001) == 0b0000_0001;
+                    let has_old_carry = (self.status & CPU::CARRY_FLAG) == CPU::CARRY_FLAG;
+                    val >>= 1;
+                    if has_old_carry {
+                        val |= 0b1000_0000;
+                    }
+                    if bit0set {
+                        self.status = self.status | CPU::CARRY_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::CARRY_FLAG;
+                    }
+                    self.set_zero_and_negative_flags(val);
+
+                    match &opcode.mode {
+                        AddressingMode::Accumulator => {
+                            self.register_a = val;
+                        }
+                        _ => {
+                            self.mem_write(addr, val);
+                        }
+                    }
+                    self.program_counter += opcode.bytes - 1;
+                }
+
+                "RTI" => {
+                    self.status = self.stack_pop();
+                    // Remove B flag following https://github.com/bugzmanov/nes_ebook/blob/c4f905346b27e3ab17277e9651d191ff310f480b/code/ch3.3/src/cpu.rs#L710C21-L710C57
+                    self.status = self.status & !CPU::B_FLAG;
+                    self.program_counter = self.stack_pop_u16();
+                }
                 _ => {
                     todo!();
                 }
@@ -2309,6 +2352,79 @@ mod test {
         }
     }
 
-    // LSR operations with other AddressingMode values are not tested.
-    // Assuming testing LSR with Accumulator and ZeroPage AddressingMode is sufficient.
+    // ROL operations with other AddressingMode values are not tested.
+    // Assuming testing ROL with Accumulator and ZeroPage AddressingMode is sufficient.
+
+    #[test]
+    fn test_0x6a_ror() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xA9,
+                0b0000_0010, // LDA
+                0x6A,        // ROR
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b0000_0001);
+            assert_eq!(cpu.status, 0);
+        }
+
+        // Stores carry.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xA9,
+                0b1000_0001, // LDA
+                0x6A,        // ROR
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b0100_0000);
+            assert_eq!(cpu.status, CPU::CARRY_FLAG);
+        }
+
+        // Applies carry.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xA9,
+                0b1000_0001, // LDA
+                0x6A,        // ROR
+                0x6A,        // ROR
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            assert_eq!(cpu.register_a, 0b1010_0000);
+            assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
+        }
+    }
+
+    // ROR operations with other AddressingMode values are not tested.
+    // Assuming testing ROR with Accumulator and ZeroPage AddressingMode is sufficient.
+
+    #[test]
+    fn test_0x40_rti() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x40, // RTI.
+                0xFF, // Invalid.
+                0x00,
+            ]);
+            // Push return address 0x8002
+            cpu.stack_push_u16(0x8002);
+            // Push status flags.
+            cpu.stack_push(0xF0);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            // Assert that B flag is removed.
+            assert_eq!(cpu.status, 0xF0 & !CPU::B_FLAG);
+        }
+    }
+
 }
