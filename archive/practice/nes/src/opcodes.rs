@@ -54,13 +54,13 @@ lazy_static! {
         OpCode::new(0x6C, "JMP", 3, 5, AddressingMode::Indirect),
 
         OpCode::new(0x69, "ADC", 2, 2, AddressingMode::Immediate),
-        OpCode::new(0x65, "ADC", 2, 2, AddressingMode::ZeroPage),
-        OpCode::new(0x75, "ADC", 2, 2, AddressingMode::ZeroPage_X),
-        OpCode::new(0x6d, "ADC", 2, 3, AddressingMode::Absolute),
-        OpCode::new(0x7d, "ADC", 2, 3, AddressingMode::Absolute_X),
-        OpCode::new(0x79, "ADC", 2, 3, AddressingMode::Absolute_Y),
-        OpCode::new(0x61, "ADC", 2, 3, AddressingMode::Indirect_X),
-        OpCode::new(0x71, "ADC", 2, 3, AddressingMode::Indirect_Y),
+        OpCode::new(0x65, "ADC", 2, 3, AddressingMode::ZeroPage),
+        OpCode::new(0x75, "ADC", 2, 4, AddressingMode::ZeroPage_X),
+        OpCode::new(0x6d, "ADC", 3, 4, AddressingMode::Absolute),
+        OpCode::new(0x7d, "ADC", 3, 4/*+1 if page crossed */, AddressingMode::Absolute_X),
+        OpCode::new(0x79, "ADC", 3, 4/*+1 if page crossed */, AddressingMode::Absolute_Y),
+        OpCode::new(0x61, "ADC", 2, 6, AddressingMode::Indirect_X),
+        OpCode::new(0x71, "ADC", 2, 5/*+1 if page crossed */, AddressingMode::Indirect_Y),
 
         OpCode::new(0x29, "AND", 2, 2, AddressingMode::Immediate),
         OpCode::new(0x25, "AND", 2, 3, AddressingMode::ZeroPage),
@@ -186,6 +186,29 @@ lazy_static! {
         OpCode::new(0x7E, "ROR", 3, 7, AddressingMode::Absolute_X),
 
         OpCode::new(0x40, "RTI", 1, 6, AddressingMode::NoneAddressing),
+        OpCode::new(0x60, "RTS", 1, 6, AddressingMode::NoneAddressing),
+
+        OpCode::new(0xE9, "SBC", 2, 2, AddressingMode::Immediate),
+        OpCode::new(0xE5, "SBC", 2, 3, AddressingMode::ZeroPage),
+        OpCode::new(0xF5, "SBC", 2, 4, AddressingMode::ZeroPage_X),
+        OpCode::new(0xEd, "SBC", 3, 4, AddressingMode::Absolute),
+        OpCode::new(0xFd, "SBC", 3, 4/*+1 if page crossed */, AddressingMode::Absolute_X),
+        OpCode::new(0xF9, "SBC", 3, 4/*+1 if page crossed */, AddressingMode::Absolute_Y),
+        OpCode::new(0xE1, "SBC", 2, 6, AddressingMode::Indirect_X),
+        OpCode::new(0xF1, "SBC", 2, 5/*+1 if page crossed */, AddressingMode::Indirect_Y),
+
+        OpCode::new(0x38, "SEC", 1, 2, AddressingMode::NoneAddressing),
+        OpCode::new(0xF8, "SED", 1, 2, AddressingMode::NoneAddressing),
+        OpCode::new(0x78, "SEI", 1, 2, AddressingMode::NoneAddressing),
+
+        OpCode::new(0x86, "STX", 2, 3, AddressingMode::ZeroPage),
+        OpCode::new(0x96, "STX", 2, 4, AddressingMode::ZeroPage_X),
+        OpCode::new(0x8e, "STX", 3, 4, AddressingMode::Absolute),
+
+        OpCode::new(0x84, "STY", 2, 3, AddressingMode::ZeroPage),
+        OpCode::new(0x94, "STY", 2, 4, AddressingMode::ZeroPage_Y),
+        OpCode::new(0x8e, "STY", 3, 4, AddressingMode::Absolute),
+
     ];
 
     pub static ref OPCODES_MAP: HashMap<u8, &'static OpCode> = {

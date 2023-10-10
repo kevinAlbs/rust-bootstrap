@@ -299,6 +299,13 @@ impl CPU {
                     }
                     self.register_a = res;
 
+                    if overflowed {
+                        self.status = self.status | CPU::OVERFLOW_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::OVERFLOW_FLAG;
+                    }
+                    self.set_zero_and_negative_flags(self.register_a);
+
                     self.program_counter += opcode.bytes - 1;
                 }
                 "AND" => {
@@ -606,7 +613,7 @@ impl CPU {
                     if self.trace {
                         println!("  JSR to {}", addr);
                     }
-                    let ret = self.program_counter + opcode.bytes - 1;
+                    let ret = self.program_counter + opcode.bytes - 1 - 1;
                     self.stack_push_u16(ret);
                     self.program_counter = addr;
                 }
@@ -777,6 +784,76 @@ impl CPU {
                     // Remove B flag following https://github.com/bugzmanov/nes_ebook/blob/c4f905346b27e3ab17277e9651d191ff310f480b/code/ch3.3/src/cpu.rs#L710C21-L710C57
                     self.status = self.status & !CPU::B_FLAG;
                     self.program_counter = self.stack_pop_u16();
+                }
+
+                "RTS" => {
+                    self.program_counter = self.stack_pop_u16() + 1;
+                }
+                "SBC" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    let value = self.mem_read(addr);
+                    if self.trace {
+                        println!(
+                            "  SBC with value: 0x{:02x}. Carry is: {}",
+                            value,
+                            self.get_carry()
+                        );
+                    }
+
+                    let carry = match self.get_carry() {
+                        0 => 0,
+                        _ => 1,
+                    };
+                    self.set_carry();
+                    // Subtract 1 - carry.
+                    let (res, underflowed) = self.register_a.overflowing_sub(1 - carry);
+                    if underflowed {
+                        self.clear_carry();
+                    }
+                    self.register_a = res;
+
+                    // Subtract value.
+                    let (res, underflowed) = self.register_a.overflowing_sub(value);
+                    if underflowed {
+                        self.clear_carry();
+                    }
+                    self.register_a = res;
+
+                    if underflowed {
+                        self.status = self.status | CPU::OVERFLOW_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::OVERFLOW_FLAG;
+                    }
+                    self.set_zero_and_negative_flags(self.register_a);
+
+                    self.program_counter += opcode.bytes - 1;
+                }
+
+                "SEC" => {
+                    self.status = self.status | CPU::CARRY_FLAG;
+                    self.program_counter += opcode.bytes - 1;
+                }
+
+                "SED" => {
+                    self.status = self.status | CPU::DECIMAL_FLAG;
+                    self.program_counter += opcode.bytes - 1;
+                }
+
+                "SEI" => {
+                    self.status = self.status | CPU::INTERRUPT_DISABLE_FLAG;
+                    self.program_counter += opcode.bytes - 1;
+                }
+
+                "STX" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    self.mem_write(addr, self.register_x);
+                    self.program_counter += opcode.bytes - 1;
+                }
+
+                "STY" => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    self.mem_write(addr, self.register_y);
+                    self.program_counter += opcode.bytes - 1;
                 }
                 _ => {
                     todo!();
@@ -2083,7 +2160,7 @@ mod test {
             cpu.run();
             assert_eq!(cpu.register_a, 123);
             let got = cpu.stack_pop_u16();
-            let expect = 0x8003;
+            let expect = 0x8002;
             assert_eq!(got, expect, "testing {:02x} and {:02x}", got, expect);
         }
     }
@@ -2427,4 +2504,123 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_0x60_rts() {
+        let mut cpu = CPU::new();
+
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0x60, // RTS.
+                0xFF, // Invalid.
+                0x00, // Break.
+                0xFF, // Invalid.
+            ]);
+            // Push return address 0x8001
+            cpu.stack_push_u16(0x8001);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+        }
+    }
+
+    #[test]
+    fn test_0xe9_sbc_immediate() {
+        let mut cpu = CPU::new();
+        // Subtracts 1 with carry set.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xA9, 0x01, // LDA 1.
+                0xE9, 0x01, // SBC 1.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.status = CPU::CARRY_FLAG;
+            cpu.run();
+            // With the carry set, expect subtracted by 1.
+            assert_eq!(cpu.register_a, 0x00);
+            // No underflow occurred. Expect carry to be set.
+            assert_eq!(cpu.get_carry(), 1);
+            assert_eq!(cpu.status, CPU::ZERO_FLAG | CPU::CARRY_FLAG);
+        }
+
+        // Subtracts 1 without carry set.
+        {
+            cpu.reset();
+            cpu.load(vec![
+                0xA9, 0x01, // LDA 1.
+                0xE9, 0x01, // SBC 1.
+            ]);
+            cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+            cpu.run();
+            // With the carry set, expect subtracted by 2.
+            assert_eq!(cpu.register_a, 0xFF);
+            assert_eq!(cpu.get_carry(), 0);
+            assert_eq!(cpu.status, CPU::NEGATIVE_FLAG | CPU::OVERFLOW_FLAG);
+        }
+    }
+
+    // SBC operations with other AddressingMode values are not tested.
+    // Assuming testing SBC with Accumulator and ZeroPage AddressingMode is sufficient.
+
+    #[test]
+    fn test_0x38_sec() {
+        let mut cpu = CPU::new();
+        cpu.reset();
+        cpu.load(vec![0x38]);
+        cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+        cpu.run();
+        assert_eq!(cpu.status, CPU::CARRY_FLAG);
+    }
+
+    #[test]
+    fn test_0xf8_sed() {
+        let mut cpu = CPU::new();
+        cpu.reset();
+        cpu.load(vec![0xf8]);
+        cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+        cpu.run();
+        assert_eq!(cpu.status, CPU::DECIMAL_FLAG);
+    }
+
+    #[test]
+    fn test_0x78_sei() {
+        let mut cpu = CPU::new();
+        cpu.reset();
+        cpu.load(vec![0x78]);
+        cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+        cpu.run();
+        assert_eq!(cpu.status, CPU::INTERRUPT_DISABLE_FLAG);
+    }
+
+    #[test]
+    fn test_0x86_stx_immediate() {
+        let mut cpu = CPU::new();
+        cpu.reset();
+        cpu.load(vec![
+            0xA2, 123, // LDX
+            0x86, 0x01, // STX
+        ]);
+        cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+        cpu.run();
+        assert_eq!(cpu.mem_read(0x0001), 123)
+    }
+
+    // STX operations with other AddressingMode values are not tested.
+    // Assuming testing with one mode is sufficient.
+
+    #[test]
+    fn test_0x86_sty_immediate() {
+        let mut cpu = CPU::new();
+        cpu.reset();
+        cpu.load(vec![
+            0xA0, 123, // LDY
+            0x84, 0x01, // STY
+        ]);
+        cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+        cpu.run();
+        assert_eq!(cpu.mem_read(0x0001), 123)
+    }
+
+    // STY operations with other AddressingMode values are not tested.
+    // Assuming testing with one mode is sufficient.
 }
