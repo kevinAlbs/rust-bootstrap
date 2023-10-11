@@ -256,11 +256,6 @@ impl CPU {
                     // TODO: return error with context if self.program_counter >= len(program)?
                     self.program_counter += opcode.bytes - 1;
                 }
-                "TAX" => {
-                    // Transfer A to X.
-                    self.register_x = self.register_a;
-                    self.set_zero_and_negative_flags(self.register_x);
-                }
                 "BRK" => {
                     // Break.
                     return;
@@ -853,6 +848,37 @@ impl CPU {
                 "STY" => {
                     let addr = self.get_operand_address(&opcode.mode);
                     self.mem_write(addr, self.register_y);
+                    self.program_counter += opcode.bytes - 1;
+                }
+
+                "TAX" => {
+                    self.register_x = self.register_a;
+                    self.set_zero_and_negative_flags(self.register_x);
+                    self.program_counter += opcode.bytes - 1;
+                }
+                "TAY" => {
+                    self.register_y = self.register_a;
+                    self.set_zero_and_negative_flags(self.register_y);
+                    self.program_counter += opcode.bytes - 1;
+                }
+                "TSX" => {
+                    self.register_x = self.stack_pointer;
+                    self.set_zero_and_negative_flags(self.register_x);
+                    self.program_counter += opcode.bytes - 1;
+                }
+                "TXA" => {
+                    self.register_a = self.register_x;
+                    self.set_zero_and_negative_flags(self.register_a);
+                    self.program_counter += opcode.bytes - 1;
+                }
+                "TXS" => {
+                    self.stack_pointer = self.register_x;
+                    // Flags are not set.
+                    self.program_counter += opcode.bytes - 1;
+                }
+                "TYA" => {
+                    self.register_a = self.register_y;
+                    self.set_zero_and_negative_flags(self.register_a);
                     self.program_counter += opcode.bytes - 1;
                 }
                 _ => {
@@ -2623,4 +2649,65 @@ mod test {
 
     // STY operations with other AddressingMode values are not tested.
     // Assuming testing with one mode is sufficient.
+
+    #[test]
+    fn test_0xaa_tax() {
+        let mut cpu = CPU::new();
+        cpu.reset();
+        cpu.load(vec![0xaa]);
+        cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+        cpu.register_a = 123;
+        cpu.run();
+        assert_eq!(cpu.register_x, 123);
+    }
+    #[test]
+    fn test_0xa8_tay() {
+        let mut cpu = CPU::new();
+        cpu.reset();
+        cpu.load(vec![0xa8]);
+        cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+        cpu.register_a = 123;
+        cpu.run();
+        assert_eq!(cpu.register_y, 123);
+    }
+    #[test]
+    fn test_0xba_tsx() {
+        let mut cpu = CPU::new();
+        cpu.reset();
+        cpu.load(vec![0xba]);
+        cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+        cpu.stack_pointer = 123;
+        cpu.run();
+        assert_eq!(cpu.register_x, 123);
+    }
+    #[test]
+    fn test_0x8a_txa() {
+        let mut cpu = CPU::new();
+        cpu.reset();
+        cpu.load(vec![0x8a]);
+        cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+        cpu.register_x = 123;
+        cpu.run();
+        assert_eq!(cpu.register_a, 123);
+    }
+    #[test]
+    fn test_0x9a_txs() {
+        let mut cpu = CPU::new();
+        cpu.reset();
+        cpu.load(vec![0x9a]);
+        cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+        cpu.register_x = 123;
+        cpu.run();
+        assert_eq!(cpu.stack_pointer, 123);
+    }
+    #[test]
+    fn test_0x98_tya() {
+        let mut cpu = CPU::new();
+        cpu.reset();
+        cpu.load(vec![0x98]);
+        cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+        cpu.register_y = 123;
+        cpu.run();
+        assert_eq!(cpu.register_a, 123);
+    }
 }
