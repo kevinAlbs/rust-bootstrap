@@ -3,7 +3,9 @@
 // RawDocumentBuf - owned. Backed by bytes.
 
 use mongodb::bson;
-use serde::{Deserialize, Serialize};
+use serde::de::{MapAccess, Visitor};
+use serde::{ser::SerializeMap, Deserialize, Serialize, Serializer};
+use std::fmt;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Book {
@@ -83,5 +85,63 @@ fn main() {
             .to_writer(&mut book_bytes)
             .expect("should write bytes");
         println!("EJSON => BSON data: {:?}", book_bytes);
+    }
+
+    // Implement Serialize and Deserialize.
+    {
+        // TimesTwo serializes `x` to twice the value.
+        struct TimesTwo {
+            x: i32,
+        }
+        impl Serialize for TimesTwo {
+            // Required method
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+            {
+                // "the Serialize implementation for the data structure is responsible for mapping the data structure into the Serde data model by invoking exactly one of the Serializer methods"
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_key("x")?;
+                let val = self.x * 2;
+                map.serialize_value(&val)?;
+                return map.end();
+            }
+        }
+
+        struct TimesTwoVisitor;
+
+        impl<'de> Visitor<'de> for TimesTwoVisitor {
+            type Value = TimesTwo;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a map mapping 'x' to an i32")
+            }
+
+            fn visit_map<A>(self, mut value: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let _: String = value.next_key()?.unwrap();
+                let value: i32 = value.next_value().unwrap();
+                return Ok(TimesTwo { x: value / 2 });
+            }
+        }
+
+        impl<'de> Deserialize<'de> for TimesTwo {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                deserializer.deserialize_map(TimesTwoVisitor)
+            }
+        }
+
+        let tt = TimesTwo { x: 123 };
+        let serialized = serde_json::to_string(&tt).expect("should serialize");
+        assert_eq!(serialized, r#"{"x":246}"#);
+        // Q: Why does this result in "trailing characters" error?
+        // A: I think because the visitor was not consuming the map input.
+        let deserialized: TimesTwo = serde_json::from_str(&serialized).expect("should deserialize");
+        assert_eq!(deserialized.x, tt.x);
     }
 }
