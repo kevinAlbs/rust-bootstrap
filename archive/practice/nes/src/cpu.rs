@@ -328,17 +328,13 @@ impl CPU {
 
                     if val & 0b1000_0000 == 0b1000_0000 {
                         self.status = self.status | CPU::CARRY_FLAG;
+                    } else {
+                        self.status = self.status & !CPU::CARRY_FLAG;
                     }
 
                     let result = val << 1;
 
-                    if result == 0 {
-                        self.status = self.status | CPU::ZERO_FLAG;
-                    }
-
-                    if result & 0b1000_0000 == 0b1000_0000 {
-                        self.status = self.status | CPU::NEGATIVE_FLAG;
-                    }
+                    self.set_zero_and_negative_flags(result);
 
                     self.register_a = result;
                 }
