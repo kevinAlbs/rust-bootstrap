@@ -1,5 +1,49 @@
 use crate::opcodes::OPCODES_MAP;
 
+enum StatusFlag {
+    Zero = 0b0000_0010,
+    Negative = 0b1000_0000,
+    Carry = 0b0000_0001,
+    Overflow = 0b0100_0000,
+    Decimal = 0b0000_1000,
+    InterruptDisable = 0b0000_0100,
+    One = 0b0010_0000, // Always pushed as 1.
+    B = 0b0001_0000,   // See https://www.nesdev.org/wiki/Status_flags#The_B_flag
+}
+pub struct Status {
+    status: u8,
+}
+
+impl Status {
+    fn new() -> Self {
+        return Self { status: 0 };
+    }
+    fn reset(&mut self) {
+        self.status = 0;
+    }
+    fn set_all(&mut self, val: u8) {
+        self.status = val;
+    }
+    fn get_all(&self) -> u8 {
+        return self.status;
+    }
+    fn set(&mut self, fl: StatusFlag, val: bool) {
+        let fl_u8 = fl as u8;
+        if val {
+            self.status |= fl_u8;
+            return;
+        }
+        self.status &= !fl_u8;
+    }
+    fn get(&self, fl: StatusFlag) -> bool {
+        let fl_u8 = fl as u8;
+        if self.status & fl_u8 != 0 {
+            return true;
+        }
+        return false;
+    }
+}
+
 pub struct CPU {
     pub register_a: u8,
     pub register_x: u8,
@@ -9,6 +53,7 @@ pub struct CPU {
     pub stack_pointer: u8,
     pub status: u8,
     pub program_counter: u16,
+    pub status2: Status,
     memory: [u8; 0xFFFF],
     trace: bool,
 }
@@ -46,6 +91,7 @@ impl CPU {
             // stack_pointer is the stack pointer.
             stack_pointer: STACK_RESET,
             status: 0,
+            status2: Status::new(),
             program_counter: 0,
             memory: [0; 0xFFFF],
             trace: false,
@@ -204,6 +250,7 @@ impl CPU {
         // TODO: set ONE_FLAG and INTERRUPT_DISABLE?
         // See: https://github.com/bugzmanov/nes_ebook/blob/c4f905346b27e3ab17277e9651d191ff310f480b/code/ch3.3/src/cpu.rs#L246
         self.status = 0;
+        self.status2.reset();
         self.program_counter = self.mem_read_u16(0xFFFC);
         self.stack_pointer = STACK_RESET;
     }
@@ -299,6 +346,7 @@ impl CPU {
                     } else {
                         self.status = self.status & !CPU::OVERFLOW_FLAG;
                     }
+                    self.status2.set(StatusFlag::Overflow, overflowed);
                     self.set_zero_and_negative_flags(self.register_a);
 
                     self.program_counter += opcode.bytes - 1;
@@ -331,6 +379,8 @@ impl CPU {
                     } else {
                         self.status = self.status & !CPU::CARRY_FLAG;
                     }
+                    self.status2
+                        .set(StatusFlag::Carry, val & 0b1000_0000 == 0b1000_0000);
 
                     let result = val << 1;
 
@@ -340,7 +390,9 @@ impl CPU {
                 }
                 "BCC" => {
                     let addr = self.get_operand_address(&opcode.mode);
-                    if self.status & CPU::CARRY_FLAG == 0b0000_0000 {
+                    if (self.status & CPU::CARRY_FLAG == 0b0000_0000)
+                        || self.status2.get(StatusFlag::Carry)
+                    {
                         self.program_counter = addr;
                     } else {
                         self.program_counter += opcode.bytes - 1;
@@ -348,7 +400,9 @@ impl CPU {
                 }
                 "BCS" => {
                     let addr = self.get_operand_address(&opcode.mode);
-                    if self.status & CPU::CARRY_FLAG == CPU::CARRY_FLAG {
+                    if (self.status & CPU::CARRY_FLAG == CPU::CARRY_FLAG)
+                        || self.status2.get(StatusFlag::Carry)
+                    {
                         self.program_counter = addr;
                     } else {
                         self.program_counter += opcode.bytes - 1;
@@ -356,7 +410,9 @@ impl CPU {
                 }
                 "BEQ" => {
                     let addr = self.get_operand_address(&opcode.mode);
-                    if self.status & CPU::ZERO_FLAG == CPU::ZERO_FLAG {
+                    if (self.status & CPU::ZERO_FLAG == CPU::ZERO_FLAG)
+                        || self.status2.get(StatusFlag::Zero)
+                    {
                         self.program_counter = addr;
                     } else {
                         self.program_counter += opcode.bytes - 1;
@@ -364,7 +420,9 @@ impl CPU {
                 }
                 "BNE" => {
                     let addr = self.get_operand_address(&opcode.mode);
-                    if self.status & CPU::ZERO_FLAG == 0b0000_0000 {
+                    if (self.status & CPU::ZERO_FLAG == 0b0000_0000)
+                        || !self.status2.get(StatusFlag::Zero)
+                    {
                         self.program_counter = addr;
                     } else {
                         self.program_counter += opcode.bytes - 1;
@@ -374,6 +432,14 @@ impl CPU {
                 "BIT" => {
                     let addr = self.get_operand_address(&opcode.mode);
                     let val = self.mem_read(addr);
+
+                    self.status2
+                        .set(StatusFlag::Zero, val & self.register_a == 0);
+                    self.status2
+                        .set(StatusFlag::Overflow, (val & 0b0100_0000) != 0);
+                    self.status2
+                        .set(StatusFlag::Negative, val & 0b1000_0000 != 0);
+
                     if val & self.register_a == 0 {
                         self.status = self.status | CPU::ZERO_FLAG;
                     } else {
@@ -395,7 +461,9 @@ impl CPU {
                 }
                 "BMI" => {
                     let addr = self.get_operand_address(&opcode.mode);
-                    if self.status & CPU::NEGATIVE_FLAG == CPU::NEGATIVE_FLAG {
+                    if self.status & CPU::NEGATIVE_FLAG == CPU::NEGATIVE_FLAG
+                        || self.status2.get(StatusFlag::Negative)
+                    {
                         self.program_counter = addr;
                     } else {
                         self.program_counter += opcode.bytes - 1;
@@ -403,7 +471,9 @@ impl CPU {
                 }
                 "BPL" => {
                     let addr = self.get_operand_address(&opcode.mode);
-                    if self.status & CPU::NEGATIVE_FLAG == CPU::NEGATIVE_FLAG {
+                    if self.status & CPU::NEGATIVE_FLAG == CPU::NEGATIVE_FLAG
+                        || self.status2.get(StatusFlag::Negative)
+                    {
                         // negative. Do not jump.
                         self.program_counter += opcode.bytes - 1;
                     } else {
@@ -412,7 +482,9 @@ impl CPU {
                 }
                 "BVC" => {
                     let addr = self.get_operand_address(&opcode.mode);
-                    if self.status & CPU::OVERFLOW_FLAG == CPU::OVERFLOW_FLAG {
+                    if self.status & CPU::OVERFLOW_FLAG == CPU::OVERFLOW_FLAG
+                        || self.status2.get(StatusFlag::Overflow)
+                    {
                         // Overflow set. Do not jump.
                         self.program_counter += opcode.bytes - 1;
                     } else {
@@ -421,7 +493,9 @@ impl CPU {
                 }
                 "BVS" => {
                     let addr = self.get_operand_address(&opcode.mode);
-                    if self.status & CPU::OVERFLOW_FLAG == CPU::OVERFLOW_FLAG {
+                    if (self.status & CPU::OVERFLOW_FLAG == CPU::OVERFLOW_FLAG)
+                        || self.status2.get(StatusFlag::Overflow)
+                    {
                         self.program_counter = addr;
                     } else {
                         self.program_counter += opcode.bytes - 1;
@@ -429,18 +503,22 @@ impl CPU {
                 }
                 "CLC" => {
                     self.status = self.status & !CPU::CARRY_FLAG;
+                    self.status2.set(StatusFlag::Carry, false);
                     self.program_counter += opcode.bytes - 1;
                 }
                 "CLD" => {
                     self.status = self.status & !CPU::DECIMAL_FLAG;
+                    self.status2.set(StatusFlag::Decimal, false);
                     self.program_counter += opcode.bytes - 1;
                 }
                 "CLI" => {
                     self.status = self.status & !CPU::INTERRUPT_DISABLE_FLAG;
+                    self.status2.set(StatusFlag::InterruptDisable, false);
                     self.program_counter += opcode.bytes - 1;
                 }
                 "CLV" => {
                     self.status = self.status & !CPU::OVERFLOW_FLAG;
+                    self.status2.set(StatusFlag::Overflow, false);
                     self.program_counter += opcode.bytes - 1;
                 }
                 "CMP" => {
@@ -449,18 +527,22 @@ impl CPU {
                     if self.trace {
                         println!("  CMP A={} with M={}", self.register_a, val);
                     }
+                    self.status2.set(StatusFlag::Carry, self.register_a >= val);
                     if self.register_a >= val {
                         self.status = self.status | CPU::CARRY_FLAG;
                     } else {
                         self.status = self.status & !CPU::CARRY_FLAG;
                     }
 
+                    self.status2.set(StatusFlag::Zero, self.register_a == val);
                     if self.register_a == val {
                         self.status = self.status | CPU::ZERO_FLAG;
                     } else {
                         self.status = self.status & !CPU::ZERO_FLAG;
                     }
 
+                    self.status2
+                        .set(StatusFlag::Negative, self.register_a < val);
                     if self.register_a < val {
                         self.status = self.status | CPU::NEGATIVE_FLAG;
                     } else {
@@ -475,18 +557,23 @@ impl CPU {
                     if self.trace {
                         println!("  CMP X={} with M={}", self.register_x, val);
                     }
+
+                    self.status2.set(StatusFlag::Carry, self.register_x >= val);
                     if self.register_x >= val {
                         self.status = self.status | CPU::CARRY_FLAG;
                     } else {
                         self.status = self.status & !CPU::CARRY_FLAG;
                     }
 
+                    self.status2.set(StatusFlag::Zero, self.register_x == val);
                     if self.register_x == val {
                         self.status = self.status | CPU::ZERO_FLAG;
                     } else {
                         self.status = self.status & !CPU::ZERO_FLAG;
                     }
 
+                    self.status2
+                        .set(StatusFlag::Negative, self.register_x < val);
                     if self.register_x < val {
                         self.status = self.status | CPU::NEGATIVE_FLAG;
                     } else {
@@ -501,18 +588,22 @@ impl CPU {
                     if self.trace {
                         println!("  CMP Y={} with M={}", self.register_y, val);
                     }
+                    self.status2.set(StatusFlag::Carry, self.register_y >= val);
                     if self.register_y >= val {
                         self.status = self.status | CPU::CARRY_FLAG;
                     } else {
                         self.status = self.status & !CPU::CARRY_FLAG;
                     }
 
+                    self.status2.set(StatusFlag::Zero, self.register_y == val);
                     if self.register_y == val {
                         self.status = self.status | CPU::ZERO_FLAG;
                     } else {
                         self.status = self.status & !CPU::ZERO_FLAG;
                     }
 
+                    self.status2
+                        .set(StatusFlag::Negative, self.register_y < val);
                     if self.register_y < val {
                         self.status = self.status | CPU::NEGATIVE_FLAG;
                     } else {
@@ -633,6 +724,7 @@ impl CPU {
                     }
 
                     println!("Shifting value {value} one bit");
+                    self.status2.set(StatusFlag::Carry, value & 0b1 == 0b1);
                     if value & 1 == 1 {
                         // Set carry.
                         self.status = self.status | CPU::CARRY_FLAG;
@@ -641,7 +733,6 @@ impl CPU {
                     }
 
                     value >>= 1;
-
                     self.set_zero_and_negative_flags(value);
 
                     match opcode.mode {
@@ -695,6 +786,7 @@ impl CPU {
                     // Remove the B flag. See https://github.com/bugzmanov/nes_ebook/blob/c4f905346b27e3ab17277e9651d191ff310f480b/code/ch3.3/src/cpu.rs#L480
                     val = val & !CPU::B_FLAG;
                     self.status = val;
+                    self.status2.set_all(val);
                     self.program_counter += opcode.bytes - 1;
                 }
 
@@ -716,6 +808,7 @@ impl CPU {
                     if has_old_carry {
                         val |= 0b1;
                     }
+                    self.status2.set(StatusFlag::Carry, bit7set);
                     if bit7set {
                         self.status = self.status | CPU::CARRY_FLAG;
                     } else {
@@ -752,6 +845,7 @@ impl CPU {
                     if has_old_carry {
                         val |= 0b1000_0000;
                     }
+                    self.status2.set(StatusFlag::Carry, bit0set);
                     if bit0set {
                         self.status = self.status | CPU::CARRY_FLAG;
                     } else {
@@ -771,9 +865,12 @@ impl CPU {
                 }
 
                 "RTI" => {
-                    self.status = self.stack_pop();
+                    let popped = self.stack_pop();
+                    self.status = popped;
                     // Remove B flag following https://github.com/bugzmanov/nes_ebook/blob/c4f905346b27e3ab17277e9651d191ff310f480b/code/ch3.3/src/cpu.rs#L710C21-L710C57
                     self.status = self.status & !CPU::B_FLAG;
+                    self.status2.set_all(popped);
+                    self.status2.set(StatusFlag::B, false);
                     self.program_counter = self.stack_pop_u16();
                 }
 
@@ -810,6 +907,7 @@ impl CPU {
                     }
                     self.register_a = res;
 
+                    self.status2.set(StatusFlag::Overflow, underflowed);
                     if underflowed {
                         self.status = self.status | CPU::OVERFLOW_FLAG;
                     } else {
@@ -822,16 +920,19 @@ impl CPU {
 
                 "SEC" => {
                     self.status = self.status | CPU::CARRY_FLAG;
+                    self.status2.set(StatusFlag::Carry, true);
                     self.program_counter += opcode.bytes - 1;
                 }
 
                 "SED" => {
                     self.status = self.status | CPU::DECIMAL_FLAG;
+                    self.status2.set(StatusFlag::Decimal, true);
                     self.program_counter += opcode.bytes - 1;
                 }
 
                 "SEI" => {
                     self.status = self.status | CPU::INTERRUPT_DISABLE_FLAG;
+                    self.status2.set(StatusFlag::InterruptDisable, true);
                     self.program_counter += opcode.bytes - 1;
                 }
 
@@ -894,6 +995,9 @@ impl CPU {
     pub const B_FLAG: u8 = 0b0001_0000; // See https://www.nesdev.org/wiki/Status_flags#The_B_flag
 
     fn set_zero_and_negative_flags(&mut self, val: u8) {
+        self.status2.set(StatusFlag::Zero, val == 0);
+        self.status2
+            .set(StatusFlag::Negative, val & 0b1000_0000 != 0);
         if val == 0 {
             self.status = self.status | CPU::ZERO_FLAG;
         } else {
@@ -908,15 +1012,20 @@ impl CPU {
     }
 
     fn get_carry(&self) -> u8 {
-        return self.status & CPU::CARRY_FLAG;
+        if (self.status & CPU::CARRY_FLAG != 0) || self.status2.get(StatusFlag::Carry) {
+            return 0b0000_0001;
+        }
+        return 0;
     }
 
     fn set_carry(&mut self) {
         self.status = self.status | CPU::CARRY_FLAG;
+        self.status2.set(StatusFlag::Carry, true);
     }
 
     fn clear_carry(&mut self) {
         self.status = self.status & !(CPU::CARRY_FLAG);
+        self.status2.set(StatusFlag::Carry, false);
     }
 }
 
