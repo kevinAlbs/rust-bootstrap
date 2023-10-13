@@ -4,7 +4,6 @@ use super::*;
 fn test_0xa9_sets_zero_flag() {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xA9, 0x00, 0x00]);
-    assert!(cpu.status & 0b0000_0010 == 0b10);
     assert!(cpu.status2.get(StatusFlag::Zero));
 }
 
@@ -20,7 +19,6 @@ fn test_0xaa_sets_x() {
 fn test_0xaa_sets_zero_flag() {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xA9, 0x00, 0xAA, 0x00]);
-    assert!(cpu.status & 0b0000_0010 == 0b10);
     assert!(cpu.status2.get(StatusFlag::Zero));
 }
 
@@ -356,7 +354,6 @@ fn test_0x29_and_immediate() {
         cpu.run();
         assert_eq!(cpu.register_a, 0b1000_0000);
         // Check that negative flag is set.
-        assert!(cpu.status & 0b1000_0000 == 0b1000_0000);
         assert!(cpu.status2.get(StatusFlag::Negative));
     }
 
@@ -369,7 +366,6 @@ fn test_0x29_and_immediate() {
         cpu.run();
         assert_eq!(cpu.register_a, 0b0);
         // Check that zero flag is set.
-        assert!(cpu.status & 0b0000_0010 == 0b0000_0010);
         assert!(cpu.status2.get(StatusFlag::Zero));
     }
 }
@@ -390,9 +386,6 @@ fn test_0x0a_asl_immediate() {
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Carry));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status & CPU::ZERO_FLAG, 0);
-        assert_eq!(cpu.status & CPU::CARRY_FLAG, 0);
-        assert_eq!(cpu.status & CPU::NEGATIVE_FLAG, 0);
     }
 
     // Check that carry flag is set.
@@ -406,9 +399,6 @@ fn test_0x0a_asl_immediate() {
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(cpu.status2.get(StatusFlag::Carry));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status & CPU::ZERO_FLAG, 0);
-        assert_eq!(cpu.status & CPU::CARRY_FLAG, CPU::CARRY_FLAG);
-        assert_eq!(cpu.status & CPU::NEGATIVE_FLAG, 0);
     }
 
     // Check that negative flag is set.
@@ -422,9 +412,6 @@ fn test_0x0a_asl_immediate() {
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Carry));
         assert!(cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status & CPU::ZERO_FLAG, 0);
-        assert_eq!(cpu.status & CPU::CARRY_FLAG, 0);
-        assert_eq!(cpu.status & CPU::NEGATIVE_FLAG, CPU::NEGATIVE_FLAG);
     }
 
     // Check that zero flag is set.
@@ -438,9 +425,6 @@ fn test_0x0a_asl_immediate() {
         assert!(cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Carry));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status & CPU::ZERO_FLAG, CPU::ZERO_FLAG);
-        assert_eq!(cpu.status & CPU::CARRY_FLAG, 0);
-        assert_eq!(cpu.status & CPU::NEGATIVE_FLAG, 0);
     }
 }
 
@@ -488,7 +472,6 @@ fn test_0xb0_bcs() {
             0xA9, 123, 0x00, // LDA value 123.
         ]);
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
-        cpu.status = CPU::CARRY_FLAG;
         cpu.status2.set(StatusFlag::Carry, true);
         cpu.run();
         assert_eq!(cpu.register_a, 123);
@@ -518,7 +501,6 @@ fn test_0xfo_beq() {
             0xA9, 123, 0x00, // LDA value 123.
         ]);
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
-        cpu.status = CPU::ZERO_FLAG;
         cpu.status2.set(StatusFlag::Zero, true);
         cpu.run();
         assert_eq!(cpu.register_a, 123);
@@ -560,7 +542,6 @@ fn test_0xfo_bne() {
             0xA9, 123, 0x00, // LDA value 123.
         ]);
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
-        cpu.status = CPU::ZERO_FLAG;
         cpu.status2.set(StatusFlag::Zero, true);
         cpu.run();
         assert_eq!(cpu.register_a, 0);
@@ -586,9 +567,6 @@ fn test_0x24_bit_zeropage() {
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(cpu.status2.get(StatusFlag::Negative));
         assert!(cpu.status2.get(StatusFlag::Overflow));
-        assert_eq!(cpu.status & CPU::ZERO_FLAG, 0b0000_0000);
-        assert_eq!(cpu.status & CPU::NEGATIVE_FLAG, CPU::NEGATIVE_FLAG);
-        assert_eq!(cpu.status & CPU::OVERFLOW_FLAG, CPU::OVERFLOW_FLAG);
     }
 
     // Test with ZeroPage. Result is 0.
@@ -606,9 +584,6 @@ fn test_0x24_bit_zeropage() {
         assert!(cpu.status2.get(StatusFlag::Zero));
         assert!(cpu.status2.get(StatusFlag::Negative));
         assert!(cpu.status2.get(StatusFlag::Overflow));
-        assert_eq!(cpu.status & CPU::ZERO_FLAG, CPU::ZERO_FLAG);
-        assert_eq!(cpu.status & CPU::NEGATIVE_FLAG, CPU::NEGATIVE_FLAG);
-        assert_eq!(cpu.status & CPU::OVERFLOW_FLAG, CPU::OVERFLOW_FLAG);
     }
 }
 
@@ -631,9 +606,6 @@ fn test_0x2c_bit_absolute() {
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(cpu.status2.get(StatusFlag::Negative));
         assert!(cpu.status2.get(StatusFlag::Overflow));
-        assert_eq!(cpu.status & CPU::ZERO_FLAG, 0b0000_0000);
-        assert_eq!(cpu.status & CPU::NEGATIVE_FLAG, CPU::NEGATIVE_FLAG);
-        assert_eq!(cpu.status & CPU::OVERFLOW_FLAG, CPU::OVERFLOW_FLAG);
     }
 }
 
@@ -649,7 +621,6 @@ fn test_0x30_bmi() {
         ]);
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.status2.set(StatusFlag::Negative, true);
-        cpu.status = CPU::NEGATIVE_FLAG;
         cpu.run();
         assert_eq!(cpu.register_a, 123);
     }
@@ -679,7 +650,6 @@ fn test_0x10_bpl() {
         ]);
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.status2.reset();
-        cpu.status = 0;
         cpu.run();
         assert_eq!(cpu.register_a, 123);
     }
@@ -693,7 +663,6 @@ fn test_0x10_bpl() {
         ]);
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.status2.set(StatusFlag::Negative, true);
-        cpu.status = CPU::NEGATIVE_FLAG;
         cpu.run();
         assert_eq!(cpu.register_a, 0);
     }
@@ -711,7 +680,6 @@ fn test_0x50_bvc() {
         ]);
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.status2.reset();
-        cpu.status = 0;
         cpu.run();
         assert_eq!(cpu.register_a, 123);
     }
@@ -725,7 +693,6 @@ fn test_0x50_bvc() {
         ]);
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.status2.set(StatusFlag::Overflow, true);
-        cpu.status = CPU::OVERFLOW_FLAG;
         cpu.run();
         assert_eq!(cpu.register_a, 0);
     }
@@ -743,7 +710,6 @@ fn test_0x70_bvs() {
         ]);
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.status2.set(StatusFlag::Overflow, true);
-        cpu.status = CPU::OVERFLOW_FLAG;
         cpu.run();
         assert_eq!(cpu.register_a, 123);
     }
@@ -757,7 +723,6 @@ fn test_0x70_bvs() {
         ]);
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.status2.reset();
-        cpu.status = 0;
         cpu.run();
         assert_eq!(cpu.register_a, 0);
     }
@@ -770,10 +735,8 @@ fn test_0x18_clc() {
     cpu.reset();
     cpu.load(vec![0x18, 0x00]);
     cpu.program_counter = cpu.mem_read_u16(0xFFFC);
-    cpu.status = 0xFF; // Everything set.
     cpu.status2.set_all(0xFF);
     cpu.run();
-    assert_eq!(cpu.status, 0xFF & !(CPU::CARRY_FLAG));
     assert_eq!(cpu.status2.get_all(), 0xFF & !(StatusFlag::Carry as u8));
 }
 
@@ -784,10 +747,8 @@ fn test_0xd8_cld() {
     cpu.reset();
     cpu.load(vec![0xd8, 0x00]);
     cpu.program_counter = cpu.mem_read_u16(0xFFFC);
-    cpu.status = 0xFF; // Everything set.
     cpu.status2.set_all(0xFF);
     cpu.run();
-    assert_eq!(cpu.status, 0xFF & !(CPU::DECIMAL_FLAG));
     assert_eq!(cpu.status2.get_all(), 0xFF & !(StatusFlag::Decimal as u8));
 }
 
@@ -798,10 +759,8 @@ fn test_0x58_cli() {
     cpu.reset();
     cpu.load(vec![0x58, 0x00]);
     cpu.program_counter = cpu.mem_read_u16(0xFFFC);
-    cpu.status = 0xFF; // Everything set.
     cpu.status2.set_all(0xFF);
     cpu.run();
-    assert_eq!(cpu.status, 0xFF & !(CPU::INTERRUPT_DISABLE_FLAG));
     assert_eq!(
         cpu.status2.get_all(),
         0xFF & !(StatusFlag::InterruptDisable as u8)
@@ -815,10 +774,8 @@ fn test_0xb8_clv() {
     cpu.reset();
     cpu.load(vec![0xb8, 0x00]);
     cpu.program_counter = cpu.mem_read_u16(0xFFFC);
-    cpu.status = 0xFF; // Everything set.
     cpu.status2.set_all(0xFF);
     cpu.run();
-    assert_eq!(cpu.status, 0xFF & !(CPU::OVERFLOW_FLAG));
     assert_eq!(cpu.status2.get_all(), 0xFF & !(StatusFlag::Overflow as u8));
 }
 
@@ -835,7 +792,6 @@ fn test_cmp() {
         ]);
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.run();
-        assert_eq!(cpu.status, CPU::CARRY_FLAG);
         assert!(cpu.status2.get(StatusFlag::Carry));
     }
 
@@ -848,7 +804,6 @@ fn test_cmp() {
         ]);
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.run();
-        assert_eq!(cpu.status, CPU::CARRY_FLAG | CPU::ZERO_FLAG);
         assert!(cpu.status2.get(StatusFlag::Carry));
         assert!(cpu.status2.get(StatusFlag::Zero));
     }
@@ -862,7 +817,6 @@ fn test_cmp() {
         ]);
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.run();
-        assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
         assert!(cpu.status2.get(StatusFlag::Negative));
     }
 }
@@ -883,7 +837,6 @@ fn test_cpx() {
         cpu.register_x = 2;
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.run();
-        assert_eq!(cpu.status, CPU::CARRY_FLAG);
         assert!(cpu.status2.get(StatusFlag::Carry));
     }
 
@@ -896,7 +849,6 @@ fn test_cpx() {
         cpu.register_x = 1;
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.run();
-        assert_eq!(cpu.status, CPU::CARRY_FLAG | CPU::ZERO_FLAG);
         assert!(cpu.status2.get(StatusFlag::Carry));
         assert!(cpu.status2.get(StatusFlag::Zero));
     }
@@ -910,7 +862,6 @@ fn test_cpx() {
         cpu.register_x = 1;
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.run();
-        assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
         assert!(cpu.status2.get(StatusFlag::Negative));
     }
 }
@@ -931,7 +882,6 @@ fn test_cpy() {
         cpu.register_y = 2;
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.run();
-        assert_eq!(cpu.status, CPU::CARRY_FLAG);
         assert!(cpu.status2.get(StatusFlag::Carry));
     }
 
@@ -944,7 +894,6 @@ fn test_cpy() {
         cpu.register_y = 1;
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.run();
-        assert_eq!(cpu.status, CPU::CARRY_FLAG | CPU::ZERO_FLAG);
         assert!(cpu.status2.get(StatusFlag::Carry));
         assert!(cpu.status2.get(StatusFlag::Zero));
     }
@@ -958,7 +907,6 @@ fn test_cpy() {
         cpu.register_y = 1;
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.run();
-        assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
         assert!(cpu.status2.get(StatusFlag::Negative));
     }
 }
@@ -981,7 +929,6 @@ fn test_0xc6_dec() {
         cpu.run();
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, 0);
         let got = cpu.mem_read(0x0001);
         assert_eq!(got, 122);
     }
@@ -998,7 +945,6 @@ fn test_0xc6_dec() {
         cpu.run();
         assert!(cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::ZERO_FLAG);
         let got = cpu.mem_read(0x0001);
         assert_eq!(got, 0);
     }
@@ -1015,7 +961,6 @@ fn test_0xc6_dec() {
         cpu.run();
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
         let got = cpu.mem_read(0x0001);
         assert_eq!(got, 255);
     }
@@ -1036,7 +981,6 @@ fn test_0xca_dex() {
         cpu.run();
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, 0);
         assert_eq!(cpu.register_x, 122);
     }
 
@@ -1049,7 +993,6 @@ fn test_0xca_dex() {
         cpu.run();
         assert!(cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::ZERO_FLAG);
         assert_eq!(cpu.register_x, 0);
     }
     // Test negative flag is set.
@@ -1061,7 +1004,6 @@ fn test_0xca_dex() {
         cpu.run();
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
         assert_eq!(cpu.register_x, 255);
     }
 }
@@ -1078,7 +1020,6 @@ fn test_0x88_dey() {
         cpu.run();
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, 0);
         assert_eq!(cpu.register_y, 122);
     }
 
@@ -1091,7 +1032,6 @@ fn test_0x88_dey() {
         cpu.run();
         assert!(cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::ZERO_FLAG);
         assert_eq!(cpu.register_y, 0);
     }
     // Test negative flag is set.
@@ -1103,7 +1043,6 @@ fn test_0x88_dey() {
         cpu.run();
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
         assert_eq!(cpu.register_y, 255);
     }
 }
@@ -1124,7 +1063,6 @@ fn test_0x49_eor() {
         cpu.run();
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, 0);
         assert_eq!(cpu.register_a, 0b0000_0110);
     }
 
@@ -1141,7 +1079,6 @@ fn test_0x49_eor() {
         cpu.run();
         assert!(cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::ZERO_FLAG);
         assert_eq!(cpu.register_a, 0b0000_0000);
     }
 
@@ -1158,7 +1095,6 @@ fn test_0x49_eor() {
         cpu.run();
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
         assert_eq!(cpu.register_a, 0b1000_0000);
     }
 }
@@ -1180,7 +1116,6 @@ fn test_0xe6_inc() {
         cpu.run();
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, 0);
         let got = cpu.mem_read(0x0001);
         assert_eq!(got, 124);
     }
@@ -1198,7 +1133,6 @@ fn test_0xe6_inc() {
         cpu.run();
         assert!(cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::ZERO_FLAG);
         let got = cpu.mem_read(0x0001);
         assert_eq!(got, 0);
     }
@@ -1218,7 +1152,6 @@ fn test_0xe6_inc() {
         cpu.run();
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
         let got = cpu.mem_read(0x0001);
         assert_eq!(got, 0b1000_0000);
     }
@@ -1239,7 +1172,6 @@ fn test_0xe8_inx() {
         cpu.run();
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, 0);
         assert_eq!(cpu.register_x, 124);
     }
 
@@ -1252,7 +1184,6 @@ fn test_0xe8_inx() {
         cpu.run();
         assert!(cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::ZERO_FLAG);
         assert_eq!(cpu.register_x, 0);
     }
     // Test negative flag is set.
@@ -1264,7 +1195,6 @@ fn test_0xe8_inx() {
         cpu.run();
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
         assert_eq!(cpu.register_x, 0b1000_0000);
     }
 }
@@ -1281,7 +1211,6 @@ fn test_0xc8_iny() {
         cpu.run();
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, 0);
         assert_eq!(cpu.register_y, 124);
     }
 
@@ -1294,7 +1223,6 @@ fn test_0xc8_iny() {
         cpu.run();
         assert!(cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::ZERO_FLAG);
         assert_eq!(cpu.register_y, 0);
     }
     // Test negative flag is set.
@@ -1306,7 +1234,6 @@ fn test_0xc8_iny() {
         cpu.run();
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
         assert_eq!(cpu.register_y, 0b1000_0000);
     }
 }
@@ -1367,7 +1294,6 @@ fn test_0xa2_ldx() {
         assert_eq!(cpu.register_x, 123);
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, 0);
     }
 }
 
@@ -1386,7 +1312,6 @@ fn test_0xa0_ldy() {
         assert_eq!(cpu.register_y, 123);
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, 0);
     }
 }
 
@@ -1409,7 +1334,6 @@ fn test_0x4a_lsr() {
         assert!(!cpu.status2.get(StatusFlag::Carry));
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, 0);
     }
 
     // Check zero flag.
@@ -1425,7 +1349,6 @@ fn test_0x4a_lsr() {
         assert!(cpu.status2.get(StatusFlag::Carry));
         assert!(cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::ZERO_FLAG | CPU::CARRY_FLAG);
     }
 }
 
@@ -1446,7 +1369,6 @@ fn test_0x46_lsr() {
         assert!(!cpu.status2.get(StatusFlag::Carry));
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, 0);
     }
 }
 
@@ -1462,7 +1384,6 @@ fn test_0xea_nop() {
         cpu.load(vec![0xEA]);
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.run();
-        assert_eq!(cpu.status, 0);
     }
 }
 
@@ -1492,7 +1413,6 @@ fn test_0x09_ora_immediate() {
         // Check that negative flag is set.
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(cpu.status2.get(StatusFlag::Negative));
-        assert!(cpu.status == CPU::NEGATIVE_FLAG);
     }
 
     // Check that zero flag is set.
@@ -1506,7 +1426,6 @@ fn test_0x09_ora_immediate() {
         // Check that zero flag is set.
         assert!(cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert!(cpu.status == CPU::ZERO_FLAG);
     }
 }
 
@@ -1570,7 +1489,6 @@ fn test_0x68_pla() {
         assert_eq!(cpu.register_a, 123);
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, 0)
     }
 }
 
@@ -1591,7 +1509,6 @@ fn test_0x28_plp() {
         cpu.run();
         assert!(cpu.status2.get(StatusFlag::Zero));
         assert!(cpu.status2.get(StatusFlag::One));
-        assert_eq!(cpu.status, CPU::ZERO_FLAG | CPU::ONE_FLAG);
     }
 }
 
@@ -1612,7 +1529,6 @@ fn test_0x2a_rol() {
         assert!(!cpu.status2.get(StatusFlag::Carry));
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, 0);
     }
 
     // Stores carry.
@@ -1629,7 +1545,6 @@ fn test_0x2a_rol() {
         assert!(cpu.status2.get(StatusFlag::Carry));
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::CARRY_FLAG);
     }
 
     // Applies carry.
@@ -1647,7 +1562,6 @@ fn test_0x2a_rol() {
         assert!(!cpu.status2.get(StatusFlag::Carry));
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, 0);
     }
 }
 
@@ -1671,7 +1585,6 @@ fn test_0x6a_ror() {
         assert!(!cpu.status2.get(StatusFlag::Carry));
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, 0);
     }
 
     // Stores carry.
@@ -1688,7 +1601,6 @@ fn test_0x6a_ror() {
         assert!(cpu.status2.get(StatusFlag::Carry));
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(!cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::CARRY_FLAG);
     }
 
     // Applies carry.
@@ -1706,7 +1618,6 @@ fn test_0x6a_ror() {
         assert!(!cpu.status2.get(StatusFlag::Carry));
         assert!(!cpu.status2.get(StatusFlag::Zero));
         assert!(cpu.status2.get(StatusFlag::Negative));
-        assert_eq!(cpu.status, CPU::NEGATIVE_FLAG);
     }
 }
 
@@ -1731,7 +1642,6 @@ fn test_0x40_rti() {
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
         cpu.run();
         // Assert that B flag is removed.
-        assert_eq!(cpu.status, 0xF0 & !CPU::B_FLAG);
         assert!(!cpu.status2.get(StatusFlag::B));
     }
 }
@@ -1766,14 +1676,12 @@ fn test_0xe9_sbc_immediate() {
             0xE9, 0x01, // SBC 1.
         ]);
         cpu.program_counter = cpu.mem_read_u16(0xFFFC);
-        cpu.status = CPU::CARRY_FLAG;
         cpu.status2.set(StatusFlag::Carry, true);
         cpu.run();
         // With the carry set, expect subtracted by 1.
         assert_eq!(cpu.register_a, 0x00);
         // No underflow occurred. Expect carry to be set.
         assert_eq!(cpu.get_carry(), 1);
-        assert_eq!(cpu.status, CPU::ZERO_FLAG | CPU::CARRY_FLAG);
         assert!(cpu.status2.get(StatusFlag::Carry));
         assert!(cpu.status2.get(StatusFlag::Zero));
     }
@@ -1790,7 +1698,6 @@ fn test_0xe9_sbc_immediate() {
         // With the carry set, expect subtracted by 2.
         assert_eq!(cpu.register_a, 0xFF);
         assert_eq!(cpu.get_carry(), 0);
-        assert_eq!(cpu.status, CPU::NEGATIVE_FLAG | CPU::OVERFLOW_FLAG);
         assert!(cpu.status2.get(StatusFlag::Negative));
         assert!(cpu.status2.get(StatusFlag::Overflow));
     }
@@ -1806,7 +1713,6 @@ fn test_0x38_sec() {
     cpu.load(vec![0x38]);
     cpu.program_counter = cpu.mem_read_u16(0xFFFC);
     cpu.run();
-    assert_eq!(cpu.status, CPU::CARRY_FLAG);
     assert!(cpu.status2.get(StatusFlag::Carry));
 }
 
@@ -1817,7 +1723,6 @@ fn test_0xf8_sed() {
     cpu.load(vec![0xf8]);
     cpu.program_counter = cpu.mem_read_u16(0xFFFC);
     cpu.run();
-    assert_eq!(cpu.status, CPU::DECIMAL_FLAG);
     assert!(cpu.status2.get(StatusFlag::Decimal));
 }
 
@@ -1828,7 +1733,6 @@ fn test_0x78_sei() {
     cpu.load(vec![0x78]);
     cpu.program_counter = cpu.mem_read_u16(0xFFFC);
     cpu.run();
-    assert_eq!(cpu.status, CPU::INTERRUPT_DISABLE_FLAG);
     assert!(cpu.status2.get(StatusFlag::InterruptDisable));
 }
 
