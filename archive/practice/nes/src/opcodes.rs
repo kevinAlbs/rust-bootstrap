@@ -179,7 +179,7 @@ lazy_static! {
         OpCode::new(0x2E, "ROL", 3, 6, AddressingMode::Absolute),
         OpCode::new(0x3E, "ROL", 3, 7, AddressingMode::Absolute_X),
 
-        OpCode::new(0x6A, "ROR", 1, 1, AddressingMode::Accumulator),
+        OpCode::new(0x6A, "ROR", 1, 2, AddressingMode::Accumulator),
         OpCode::new(0x66, "ROR", 2, 5, AddressingMode::ZeroPage),
         OpCode::new(0x76, "ROR", 2, 6, AddressingMode::ZeroPage_X),
         OpCode::new(0x6E, "ROR", 3, 6, AddressingMode::Absolute),
@@ -207,7 +207,7 @@ lazy_static! {
 
         OpCode::new(0x84, "STY", 2, 3, AddressingMode::ZeroPage),
         OpCode::new(0x94, "STY", 2, 4, AddressingMode::ZeroPage_Y),
-        OpCode::new(0x8e, "STY", 3, 4, AddressingMode::Absolute),
+        OpCode::new(0x8C, "STY", 3, 4, AddressingMode::Absolute),
 
         OpCode::new(0xAA, "TAX", 1, 2, AddressingMode::NoneAddressing),
         OpCode::new(0xA8, "TAY", 1, 2, AddressingMode::NoneAddressing),
