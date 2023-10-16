@@ -1,3 +1,6 @@
+https://bugzmanov.github.io/nes_ebook/chapter_4.html
+"Therefor" => "Therefore"
+
 https://bugzmanov.github.io/nes_ebook/chapter_3_2.html
 https://github.com/bugzmanov/nes_ebook/blob/c4f905346b27e3ab17277e9651d191ff310f480b/code/ch3.3/src/cpu.rs#L246
 Book suggest setting `status` to 0. Code sets status BREAK and BREAK2 flags to 1 on reset.

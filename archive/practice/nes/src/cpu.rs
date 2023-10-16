@@ -55,6 +55,7 @@ pub struct CPU {
     pub status: Status,
     memory: [u8; 0xFFFF],
     trace: bool,
+    pub snake_mode: bool, // If true, applies behavior needed to test the snake game described in https://bugzmanov.github.io/nes_ebook/chapter_3_4.html.
 }
 
 // STACK is the starting address of the stack.
@@ -93,6 +94,7 @@ impl CPU {
             program_counter: 0,
             memory: [0; 0xFFFF],
             trace: false,
+            snake_mode: false,
         }
     }
 
@@ -220,11 +222,11 @@ impl CPU {
         self.mem_write(addr, self.register_a);
     }
 
-    fn mem_read(&self, addr: u16) -> u8 {
+    pub fn mem_read(&self, addr: u16) -> u8 {
         return self.memory[addr as usize];
     }
 
-    fn mem_write(&mut self, addr: u16, val: u8) {
+    pub fn mem_write(&mut self, addr: u16, val: u8) {
         self.memory[addr as usize] = val;
     }
 
@@ -254,6 +256,11 @@ impl CPU {
 
     pub fn load(&mut self, program: Vec<u8>) {
         assert!(program.len() <= 0x8000);
+        if self.snake_mode {
+            self.memory[0x0600..(0x0600 + program.len())].copy_from_slice(&program[..]);
+            self.mem_write_u16(0xFFFC, 0x0600);
+            return;
+        }
         self.memory[0x8000..(0x8000 + program.len())].copy_from_slice(&program[..]);
         self.mem_write_u16(0xFFFC, 0x8000);
     }
@@ -265,7 +272,16 @@ impl CPU {
     }
 
     pub fn run(&mut self) {
+        self.run_with_callback(|_| {})
+    }
+
+    pub fn run_with_callback<F>(&mut self, mut cb: F)
+    where
+        F: FnMut(&mut CPU),
+    {
         loop {
+            cb(self);
+
             // TODO: return error with context if self.program_counter >= len(program)?
             let op = self.mem_read(self.program_counter);
             self.program_counter += 1;
