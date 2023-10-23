@@ -153,8 +153,10 @@ fn SSTableInMemory_can_write_to_disk() {
     assert_eq!(
         got,
         vec![
-            3, 0, 0, 0, 'f' as u8, 'o' as u8, 'o' as u8, 3, 0, 0, 0, 'b' as u8, 'a' as u8,
-            'r' as u8
+            3, 0, 0, 0, //
+            'f' as u8, 'o' as u8, 'o' as u8, //
+            3, 0, 0, 0, //
+            'b' as u8, 'a' as u8, 'r' as u8
         ]
     )
 }
