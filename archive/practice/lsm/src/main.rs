@@ -63,8 +63,21 @@ impl SSTableInMemory {
         return self.strings.get(&key);
     }
 
-    fn write_to_disk() -> Result<(), Box<dyn Error>> {
-        todo!("Not yet implemented");
+    // Write SSTableInMemory on disk as follows:
+    // [ key len as little-endian uint32 ] [ key ] [ value len as little endian uint32 ] [ value ]
+    fn write_to_disk(&self, path: &std::path::Path) -> Result<(), Box<dyn Error>> {
+        let mut data = Vec::<u8>::new();
+        for (k, v) in &self.strings {
+            let klen = k.len() as u32;
+            data.extend_from_slice(&klen.to_le_bytes());
+            data.extend_from_slice(k.as_bytes());
+            let vlen = v.len() as u32;
+            data.extend_from_slice(&vlen.to_le_bytes());
+            data.extend_from_slice(v.as_bytes());
+        }
+        // data.extend_from_slice()
+        // Only call `fs::write` once to limit possible incomplete writes on process exit.
+        std::fs::write(path, data);
         return Ok(());
     }
 }
@@ -104,4 +117,44 @@ fn SSTableInMemory_tracks_size() {
         let got = sst.insert_str("a".to_string(), "b".to_string());
         assert!(got.is_none());
     }
+}
+
+struct TempFile {
+    path: std::path::PathBuf,
+}
+
+impl TempFile {
+    fn new(path: &std::path::Path) -> Self {
+        return TempFile {
+            path: path.to_path_buf(),
+        };
+    }
+}
+
+impl Drop for TempFile {
+    fn drop(&mut self) {
+        // Ignore error in case file does not exist. Test may have exited before creating the file.
+        std::fs::remove_file(&self.path);
+    }
+}
+
+#[test]
+fn SSTableInMemory_can_write_to_disk() {
+    let tempfile = TempFile::new(&std::path::Path::new(
+        "SSTableInMemory_can_write_to_disk.db",
+    ));
+    let mut sst = SSTableInMemory::new();
+    sst.insert_str("foo".to_string(), "bar".to_string());
+    sst.write_to_disk(&tempfile.path)
+        .expect("Should write to disk");
+    // Read contents.
+    let got = std::fs::read(&tempfile.path).expect("can read file");
+
+    assert_eq!(
+        got,
+        vec![
+            3, 0, 0, 0, 'f' as u8, 'o' as u8, 'o' as u8, 3, 0, 0, 0, 'b' as u8, 'a' as u8,
+            'r' as u8
+        ]
+    )
 }
