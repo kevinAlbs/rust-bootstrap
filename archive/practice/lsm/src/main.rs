@@ -1,6 +1,9 @@
 use core::fmt;
 use std::collections::HashMap;
 use std::error::Error;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::thread;
 
 struct SSTableOnDisk {}
 
@@ -82,6 +85,56 @@ impl SSTableInMemory {
     }
 }
 
+// LSMImpl implements thread-unsafe structures.
+// LSMImpl is used by LSM by a lock.
+struct LSMImpl {
+    // When `active` reaches the maximum size, it is written to disk, and then reset.
+    inmemory: SSTableInMemory,
+}
+
+impl LSMImpl {
+    fn new() -> Self {
+        return LSMImpl {
+            inmemory: SSTableInMemory::new(),
+        };
+    }
+}
+
+// LSM may lose writes if the process exits.
+// The `path` may not be used by more than one process.
+// LSM is thread-safe.
+#[derive(Clone)]
+struct LSM {
+    // `path` is the path to the directory containing the data for the LSM.
+    path: String,
+    lsmimpl: std::sync::Arc<std::sync::Mutex<LSMImpl>>,
+}
+
+impl LSM {
+    fn new() -> Self {
+        return LSM {
+            path: "foo".to_string(),
+            lsmimpl: std::sync::Arc::new(std::sync::Mutex::new(LSMImpl::new())),
+        };
+    }
+
+    fn insert_str(&mut self, key: String, val: String) {
+        println!("LSM inserting [{:?}] => {:?}", key, val);
+        // TODO: lock.
+        // TODO: if `inmemory` has capacity, insert.
+        // TODO: else: write `inmemory` to disk.
+        // TODO: check `inmemory`.
+        // TODO: if `inmemory` does not contain `key`, check disk files.
+        //
+        return;
+    }
+
+    pub fn find_str(&self, key: String) -> Option<&String> {
+        print!("LSM finding [{:?}]", key);
+        return None;
+    }
+}
+
 fn main() {
     println!("Hello, world!");
 }
@@ -159,4 +212,37 @@ fn SSTableInMemory_can_write_to_disk() {
             'b' as u8, 'a' as u8, 'r' as u8
         ]
     )
+}
+
+#[test]
+fn LSM_can_insert_multithreaded() {
+    let lsm = LSM::new();
+    let mut lsm1 = lsm.clone();
+    let handle1 = thread::spawn(move || {
+        lsm1.insert_str(
+            "key_from_thread1".to_string(),
+            "value_from_thread1".to_string(),
+        );
+        lsm1.insert_str("shared_key".to_string(), "value_from_thread1".to_string());
+    });
+
+    let mut lsm2 = lsm.clone();
+    let handle2 = thread::spawn(move || {
+        lsm2.insert_str(
+            "key_from_thread2".to_string(),
+            "value_from_thread2".to_string(),
+        );
+        lsm2.insert_str("shared_key".to_string(), "value_from_thread2".to_string());
+    });
+    handle1.join().expect("handle1 should join");
+    handle2.join().expect("handle2 should join");
+    assert_eq!(
+        lsm.find_str("shared_key".to_string()),
+        Some(&"shared_value".to_string()),
+    );
+    let got = lsm
+        .find_str("shared_key".to_string())
+        .expect("should have value for `shared_key`");
+    let got = got.to_owned();
+    assert!(got == "value_from_thread1" || got == "value_from_thread2");
 }
