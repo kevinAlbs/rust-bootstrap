@@ -32,7 +32,6 @@ impl SSTableInMemory {
     const MAX_SIZE: usize = 4096;
     fn new() -> Self {
         return SSTableInMemory {
-            // map: HashMap
             strings: HashMap::new(),
             size: 0,
         };
@@ -602,7 +601,7 @@ struct TempDir {
 impl TempDir {
     fn new(path: &std::path::Path) -> Self {
         // Ignore error in case directory does not exist. Test may have exited before creating the file.
-        std::fs::remove_dir_all(path).expect("should remove all");
+        std::fs::remove_dir_all(path);
         std::fs::create_dir(path.clone()).expect("can create directory");
         return TempDir {
             path: path.to_path_buf(),
@@ -613,7 +612,7 @@ impl TempDir {
 impl Drop for TempDir {
     fn drop(&mut self) {
         // Ignore error in case directory does not exist. Test may have exited before creating the file.
-        // std::fs::remove_dir_all(&self.path);
+        std::fs::remove_dir_all(&self.path);
     }
 }
 
