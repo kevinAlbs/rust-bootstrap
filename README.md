@@ -1,3 +1,28 @@
+# TIL
+
+## TIL 1: All references have lifetimes.
+```rust
+// All references have lifetimes.
+// Sometimes lifetime specifiers can be elided.
+// See: https://stackoverflow.com/a/72778738
+
+// Example: No lifetime specifier needed.
+fn foo(input: &str) -> &str {
+    return &input[1..];
+}
+
+// Example: Equivalent to above.
+fn foo2<'a>(input: &'a str) -> &'a str {
+    return &input[1..];
+}
+
+#[test]
+fn test_foos() {
+    assert_eq!(foo("abc"), "bc");
+    assert_eq!(foo2("abc"), "bc");
+}
+```
+
 # Goofs
 ## Goof 1: Cannot construct a Path from temporary strings.
 
