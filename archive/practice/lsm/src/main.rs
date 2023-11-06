@@ -11,7 +11,7 @@ use std::sync::Mutex;
 use std::thread;
 
 // Q: What does SSTable stand for?
-// A:
+// A: Sorted Strings Table.
 struct SSTableInMemory {
     // Reserve maximum size of in memory store.
     // map: HashMap<[u8], [u8]>
