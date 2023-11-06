@@ -94,7 +94,7 @@ impl SSTableInMemory {
 
     // If found, returns a copy of the value.
     // Q: Why does return type not require a lifetime?
-    // A:
+    // A: The lifetime may be elided. See: https://doc.rust-lang.org/reference/lifetime-elision.html
     pub fn find_str(&self, key: String) -> Option<&String> {
         return self.strings.get(&key);
     }
