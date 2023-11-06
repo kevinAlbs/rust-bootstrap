@@ -26,6 +26,43 @@ impl fmt::Display for SSTableHasNoCapacityError {
     }
 }
 
+struct SSTableError {
+    msg: String,
+    wrapped: Option<Box<dyn Error>>,
+}
+
+impl SSTableError {
+    fn wrap(msg: String, err: Box<dyn Error>) -> Self {
+        return SSTableError {
+            msg: msg,
+            wrapped: Some(err),
+        };
+    }
+}
+impl Error for SSTableError {}
+
+impl fmt::Debug for SSTableError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SSTableError: '{}'", self.msg)?;
+        if self.wrapped.is_some() {
+            let err = self.wrapped.as_ref().unwrap();
+            write!(f, " wraps error: '{}'", err)?;
+        }
+        return Ok(());
+    }
+}
+
+impl fmt::Display for SSTableError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SSTableError: {}", self.msg)?;
+        if self.wrapped.is_some() {
+            let err = self.wrapped.as_ref().unwrap();
+            write!(f, "Wrapped error: {}", err)?;
+        }
+        return Ok(());
+    }
+}
+
 impl SSTableInMemory {
     const MAX_SIZE: usize = 4096;
     fn new() -> Self {
@@ -88,8 +125,13 @@ impl SSTableInMemory {
         // When the directory did not exist, this error was returned:
         // "No such file or directory (os error 2)"
         // It may be easier to identify which operation errored if the path is added.
-        // A:
-        std::fs::write(path, data)?;
+        // A: Yes. By wrapping the error in another struct that implements the Error trait.
+        if let Err(err) = std::fs::write(path, data) {
+            return Err(Box::new(SSTableError::wrap(
+                format!("Failed to write: {:?}", path),
+                Box::new(err),
+            )));
+        }
         return Ok(());
     }
 
