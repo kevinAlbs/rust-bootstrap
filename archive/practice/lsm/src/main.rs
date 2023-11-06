@@ -8,6 +8,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::thread;
 
 // Q: What does SSTable stand for?
 // A:
