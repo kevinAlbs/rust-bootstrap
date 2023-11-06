@@ -10,6 +10,9 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
 
+#[cfg(test)]
+mod test;
+
 // Q: What does SSTable stand for?
 // A: Sorted Strings Table.
 struct SSTableInMemory {
@@ -55,6 +58,43 @@ impl fmt::Debug for SSTableError {
 impl fmt::Display for SSTableError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "SSTableError: {}", self.msg)?;
+        if self.wrapped.is_some() {
+            let err = self.wrapped.as_ref().unwrap();
+            write!(f, "Wrapped error: {}", err)?;
+        }
+        return Ok(());
+    }
+}
+
+struct LSMError {
+    msg: String,
+    wrapped: Option<Box<dyn Error>>,
+}
+
+impl LSMError {
+    fn wrap(msg: String, err: Box<dyn Error>) -> Self {
+        return LSMError {
+            msg: msg,
+            wrapped: Some(err),
+        };
+    }
+}
+impl Error for LSMError {}
+
+impl fmt::Debug for LSMError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LSMError: '{}'", self.msg)?;
+        if self.wrapped.is_some() {
+            let err = self.wrapped.as_ref().unwrap();
+            write!(f, " wraps error: '{}'", err)?;
+        }
+        return Ok(());
+    }
+}
+
+impl fmt::Display for LSMError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LSMError: {}", self.msg)?;
         if self.wrapped.is_some() {
             let err = self.wrapped.as_ref().unwrap();
             write!(f, "Wrapped error: {}", err)?;
@@ -157,7 +197,7 @@ impl LSMImpl {
 }
 
 // LSM may lose writes if the process exits.
-// The `path` may not be used by more than one process.
+// The `datapath` may not be used by more than one process.
 // LSM is thread-safe.
 #[derive(Clone)]
 struct LSM {
@@ -183,7 +223,14 @@ impl LSM {
         if !countpath.exists() {
             return Ok(0);
         }
-        let contents_vec = std::fs::read(countpath.clone())?;
+        let res = std::fs::read(countpath.clone());
+        if res.is_err() {
+            return Err(Box::new(LSMError::wrap(
+                format!("failed to read: {:?}", datapath),
+                Box::new(res.err().unwrap()),
+            )));
+        }
+        let contents_vec = res.unwrap();
         let contents_str = String::from_utf8(contents_vec)?;
         let count: i32 = contents_str.parse()?;
         return Ok(count);
@@ -193,7 +240,13 @@ impl LSM {
     fn write_count(&self, count: i32) -> Result<(), Box<dyn Error + '_>> {
         let datapath = std::path::PathBuf::from(&self.datapath);
         let countpath = datapath.join("count.txt");
-        fs::write(countpath, format!("{}", count))?;
+        let res = fs::write(countpath, format!("{}", count));
+        if res.is_err() {
+            return Err(Box::new(LSMError::wrap(
+                format!("failed to write: {:?}", datapath),
+                Box::new(res.err().unwrap()),
+            )));
+        }
         return Ok(());
     }
 
@@ -381,7 +434,14 @@ impl LSM {
         let mut idx_to_last_key = HashMap::<i32, Option<String>>::new();
         for file_idx in 0..count {
             let filepath = datapath.join(format!("{:04}.dat", file_idx));
-            let f = fs::OpenOptions::new().read(true).open(filepath.clone())?;
+            let res = fs::OpenOptions::new().read(true).open(filepath.clone());
+            if res.is_err() {
+                return Err(Box::new(LSMError::wrap(
+                    format!("failed to open: {:?}", filepath),
+                    Box::new(res.err().unwrap()),
+                )));
+            }
+            let f = res.unwrap();
             let got = idx_to_file.insert(file_idx, f);
             assert!(got.is_none()); // Should not have overwritten a value.
             let first_key = self.read_key(idx_to_file.get_mut(&file_idx).unwrap())?;
@@ -396,16 +456,28 @@ impl LSM {
         // Delete merged.dat if it exists.
         let outfile_path = datapath.join("merged.dat");
         if outfile_path.exists() {
-            std::fs::remove_file(outfile_path)?;
+            let res = std::fs::remove_file(&outfile_path);
+            if res.is_err() {
+                return Err(Box::new(LSMError::wrap(
+                    format!("failed to remove: {:?}", &outfile_path),
+                    Box::new(res.err().unwrap()),
+                )));
+            }
         }
 
         {
             // Merge into one file.
-            let mut outfile = fs::OpenOptions::new()
+            let res = fs::OpenOptions::new()
                 .create(true)
                 .write(true)
-                .open(datapath.join("merged.dat"))
-                .expect("should open merged.dat");
+                .open(datapath.join("merged.dat"));
+            if res.is_err() {
+                return Err(Box::new(LSMError::wrap(
+                    format!("failed to open: {:?}", datapath.join("merged.dat")),
+                    Box::new(res.err().unwrap()),
+                )));
+            }
+            let mut outfile = res.unwrap();
 
             loop {
                 // Get the smallest key of all files.
@@ -490,13 +562,25 @@ impl LSM {
         // Remove all data files.
         for file_idx in 0..count {
             let filepath = datapath.join(format!("{:04}.dat", file_idx));
-            std::fs::remove_file(filepath)?;
+            let res = std::fs::remove_file(&filepath);
+            if res.is_err() {
+                return Err(Box::new(LSMError::wrap(
+                    format!("failed to remove: {:?}", &filepath),
+                    Box::new(res.err().unwrap()),
+                )));
+            }
         }
 
         // Rename merged.dat to 0000.dat.
         let from = datapath.join("merged.dat");
         let to = datapath.join("0000.dat");
-        std::fs::rename(from, to)?;
+        let res = std::fs::rename(from, to);
+        if res.is_err() {
+            return Err(Box::new(LSMError::wrap(
+                format!("failed to rename: {:?} to {:?}", "merged.dat", "0000.dat"),
+                Box::new(res.err().unwrap()),
+            )));
+        }
 
         // Update count.txt to 1.
         self.write_count(1)?;
