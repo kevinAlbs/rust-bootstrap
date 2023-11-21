@@ -48,7 +48,7 @@ async fn main() -> mongodb::error::Result<()> {
 
     // start-2dsphere
     let index = IndexModel::builder()
-        .keys(doc! { "location": "2dsphere" })
+        .keys(doc! { "location.geo": "2dsphere" })
         .build();
 
     let idx = my_coll.create_index(index, None).await?;
@@ -57,7 +57,7 @@ async fn main() -> mongodb::error::Result<()> {
 
     // start-2d
     let index = IndexModel::builder()
-        .keys(doc! { "location.coordinates": "2d" })
+        .keys(doc! { "location.geo.coordinates": "2d" })
         .build();
 
     let idx = my_coll.create_index(index, None).await?;
@@ -66,7 +66,7 @@ async fn main() -> mongodb::error::Result<()> {
 
     // start-proximity
     let mongodb = vec![-73.986805, 40.7620853];
-    let query = doc! {"location":
+    let query = doc! {"location.geo":
         doc! { "$near": {
             "$geometry": {
                 "type": "Point", "coordinates": mongodb,
@@ -90,7 +90,7 @@ async fn main() -> mongodb::error::Result<()> {
         vec![-87.651, 41.653],
     ];
 
-    let query = doc! {"location":
+    let query = doc! {"location.geo":
         doc! { "$geoWithin": { "$polygon": chicago }}
     };
 
