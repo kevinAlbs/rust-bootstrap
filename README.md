@@ -70,6 +70,10 @@ println! ("as_i32={:?}, as_f64={:?}", as_i32, as_f64);
 
 # Rust Driver Q&A
 
+# Q4: What is the default maxPoolSize?
+
+`10`. This differs from the specification.
+
 # Q3: Is it preferable to reference `bson` crate directly, or through `mongodb`?
 Example:
 ```rust
