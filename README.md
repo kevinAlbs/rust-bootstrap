@@ -70,11 +70,11 @@ println! ("as_i32={:?}, as_f64={:?}", as_i32, as_f64);
 
 # Rust Driver Q&A
 
-# Q4: What is the default maxPoolSize?
+## Q4: What is the default maxPoolSize?
 
 `10`. This differs from the specification.
 
-# Q3: Is it preferable to reference `bson` crate directly, or through `mongodb`?
+## Q3: Is it preferable to reference `bson` crate directly, or through `mongodb`?
 Example:
 ```rust
 use bson::Document;
@@ -83,7 +83,7 @@ use mongodb::bson::Document;
 ```
 A: (Open)
 
-# Q2: Does `Cursor.try_next` return None if `getMore` is still in flight?
+## Q2: Does `Cursor.try_next` return None if `getMore` is still in flight?
 A: No? Blocking `getMore` with a failpoint results in this loop returning all documents:
 ```rust
 while let Some(book) = cursor.try_next().await? {
