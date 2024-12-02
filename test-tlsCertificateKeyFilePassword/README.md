@@ -30,3 +30,8 @@ pkcs8 = { version = "0.10.2", features = [
     "sha1-insecure",
 ] }
 ```
+
+Run:
+```
+export CERTPATH="/Users/kevin.albertson/code/drivers-evergreen-tools/.evergreen/x509gen";
+cargo run
