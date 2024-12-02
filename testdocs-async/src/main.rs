@@ -1,25 +1,15 @@
 use mongodb::{
     bson::doc,
-    options::{AuthMechanism, ClientOptions, Credential},
+    options::{ClientOptions},
     Client,
 };
 
 #[tokio::main]
 async fn main() -> mongodb::error::Result<()> {
-    let uri = "mongodb://foo:bar@localhost:27017/?authSource=$external&authMechanism=PLAIN";
-    let mut client_options = ClientOptions::parse(uri).await?;
-
-    // start-ldap
-    let plain_cred = Credential::builder()
-        .username("<username>".to_string())
-        .password("<password>".to_string())
-        .mechanism(AuthMechanism::Plain)
-        .source("$external".to_string())
-        .build();
-
-    client_options.credential = Some(plain_cred);
-    let client = Client::with_options(client_options)?;
-    // end-ldap
-
+    let uri = "mongodb+srv://test1.kevinalbs.com";
+    let client_options = ClientOptions::parse(uri).await?;
+    let client : mongodb::Client = Client::with_options(client_options)?;
+    
+    client.database("foo").run_command(doc!{"ping": 1}, None).await?;
     Ok(())
 }

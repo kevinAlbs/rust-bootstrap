@@ -46,5 +46,22 @@ async fn main() -> Result<()> {
         .await;
     assert_eq!(colls.unwrap()[0], "coll1");
 
+    // Try passing a session
+    {
+        let mut sess = client.start_session().await.expect("should start");
+        let mut cursor = db
+            .list_collections()
+            .session(&mut sess)
+            .authorized_collections(true)
+            .await
+            .expect("should create cursor");
+        let spec = cursor
+            .next(&mut sess)
+            .await
+            .expect("should succeed")
+            .expect("should have spec");
+        assert_eq!(spec.name, "coll1");
+    }
+
     return Ok(());
 }
