@@ -36,3 +36,8 @@ Run:
 export $CERTPATH
 cargo run
 ```
+
+Expect a successful ping:
+```
+got: Document({"ok": Double(1.0)})
+```
