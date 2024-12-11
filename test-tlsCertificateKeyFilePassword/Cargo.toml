@@ -6,12 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies.mongodb]
-path = "/Users/kevin.albertson/review/mongo-rust-driver-1256"
-features = ["openssl-tls"]
+git = "https://github.com/mongodb/mongo-rust-driver.git"
+# Commit on ipv6-backport:
+rev = "732dc54b"
+features = ["openssl-tls", "cert-key-password"]
 
-[dependencies.serde]
-version = "1.0.125"
+# Add pkcs8 with feature flags to enable insecure algorithms.
+# Due to "Feature unification", this enables feature flags for mongodb driver.
+[dependencies.pkcs8]
+version = "0.10.2"
+features = ["3des", "des-insecure", "sha1-insecure"]
 
 [dependencies]
-serde_json = "1.0"
 tokio = "1.0"
