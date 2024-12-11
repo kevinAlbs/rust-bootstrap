@@ -9,7 +9,7 @@ async fn main() -> mongodb::error::Result<()> {
     let client = Client::with_options(opts)?;
     let res = client
         .database("test")
-        .run_command(doc! {"ping": 1})
+        .run_command(doc! {"ping": 1}, None)
         .await?;
     println!("got: {:?}", res);
     Ok(())
