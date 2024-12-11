@@ -11,7 +11,7 @@ $MONGODB/mongod \
     --dbpath .menv
 ```
 
-Update `dependencies.mongodb.path` in Cargo.toml to refer to a commit of the Rust driver with needed changes. Enable the :
+Update `dependencies.mongodb.path` in Cargo.toml to refer to a commit of the Rust driver with needed changes. Enable the `cert-key-password` feature:
 
 ```toml
 [dependencies.mongodb]
