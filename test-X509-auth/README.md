@@ -21,9 +21,7 @@ openssl x509 -in $CERTPATH/client.pem -inform PEM -subject -nameopt RFC2253 -noo
 Connect with `mongosh`:
 ```
 mongosh --tls --tlsCertificateKeyFile $CERTPATH/client.pem \
-    --tlsCAFile $CERTPATH/ca.pem \
-    --authenticationDatabase '$external' \
-    --authenticationMechanism MONGODB-X509
+    --tlsCAFile $CERTPATH/ca.pem
 ```
 
 Create a user with X509 auth:
