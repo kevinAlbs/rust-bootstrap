@@ -60,7 +60,7 @@ features = ["3des", "des-insecure", "sha1-insecure"]
 
 Run:
 ```bash
-export $CERTPATH
+export CERTPATH
 cargo run
 ```
 
