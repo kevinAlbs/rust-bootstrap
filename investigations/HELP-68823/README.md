@@ -9,7 +9,10 @@ $MONGODB/mongod \
     --tlsCertificateKeyFile=$CERTPATH/server.pem \
     --tlsMode=requireTLS \
     --dbpath .menv \
-    --ipv6
+    --ipv6 \
+    --bind_ip=:: \
+    --tlsDisabledProtocols="noTLS1_0,noTLS1_1" \
+    --tlsCipherConfig="ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDH-ECDSA-AES256-GCM-SHA384:ECDH-ECDSA-AES128-GCM-SHA256:ECDH-ECDSA-AES128-SHA256:AES256-GCM-SHA384:AES128-GCM-SHA256:AES128-SHA256
 ```
 
 Update `dependencies.mongodb.path` in Cargo.toml to refer to a commit of the Rust driver with needed changes. Enable the `cert-key-password` feature:
