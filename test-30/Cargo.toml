@@ -6,9 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies.mongodb]
+version = "3.1"
 # git = "https://github.com/mongodb/mongo-rust-driver.git"
 # rev = "3df0eab"
-path = "/Users/kevin.albertson/review/mongo-rust-driver-1256"
+# path = "/Users/kevin.albertson/review/mongo-rust-driver-1256"
 
 # default-features = false
 # default-features = false
