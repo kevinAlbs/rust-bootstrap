@@ -1,14 +1,15 @@
 To test, start a server with [test certificates](https://github.com/mongodb-labs/drivers-evergreen-tools/tree/93b20d9660fa5ef82b63d541d5a6f86f80ba4503/.evergreen/x509gen):
 
 ```bash
-MONGODB="$HOME/bin/mongodl/archive/8.0.0/mongodb-macos-aarch64-enterprise-8.0.0/bin/"
-CERTPATH="$HOME/code/drivers-evergreen-tools/.evergreen/x509gen"
+export MONGODB="$HOME/mongodb-linux-x86_64-enterprise-ubuntu2004-4.4.29/bin/"
+export CERTPATH="$HOME/drivers-evergreen-tools/.evergreen/x509gen"
 
 $MONGODB/mongod \
     --tlsCAFile=$CERTPATH/ca.pem \
     --tlsCertificateKeyFile=$CERTPATH/server.pem \
     --tlsMode=requireTLS \
-    --dbpath .menv
+    --dbpath .menv \
+    --ipv6
 ```
 
 Update `dependencies.mongodb.path` in Cargo.toml to refer to a commit of the Rust driver with needed changes. Enable the `cert-key-password` feature:
