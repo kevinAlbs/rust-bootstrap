@@ -22,6 +22,8 @@ rev = "732dc54b"
 features = ["openssl-tls", "cert-key-password"]
 ```
 
+To test with `rustls-tls`, remove the `openssl-tls` feature.
+
 The test certificates are encrypted with the insecure 3DES algorithm. To permit insecure algorithms for the test certificate, add the `pkcs8` dependency with needed feature flags:
 
 ```toml
