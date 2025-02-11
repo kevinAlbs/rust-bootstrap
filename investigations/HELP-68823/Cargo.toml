@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies.mongodb]
 git = "https://github.com/mongodb/mongo-rust-driver.git"
 # Commit on ipv6-backport:
-rev = "732dc54b"
+rev = "6ad6c6ec"
 features = ["openssl-tls", "cert-key-password"]
 
 # Add pkcs8 with feature flags to enable insecure algorithms.
