@@ -19,3 +19,4 @@ features = ["3des", "des-insecure", "sha1-insecure"]
 
 [dependencies]
 tokio = "1.0"
+openssl = { version = "0.10" }

@@ -10,9 +10,7 @@ $MONGODB/mongod \
     --tlsMode=requireTLS \
     --dbpath .menv \
     --ipv6 \
-    --bind_ip=:: \
-    --tlsDisabledProtocols="noTLS1_0,noTLS1_1" \
-    --tlsCipherConfig="ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDH-ECDSA-AES256-GCM-SHA384:ECDH-ECDSA-AES128-GCM-SHA256:ECDH-ECDSA-AES128-SHA256:AES256-GCM-SHA384:AES128-GCM-SHA256:AES128-SHA256
+    --bind_ip=::
 ```
 
 Update `dependencies.mongodb.path` in Cargo.toml to refer to a commit of the Rust driver with needed changes. Enable the `cert-key-password` feature:
@@ -21,7 +19,7 @@ Update `dependencies.mongodb.path` in Cargo.toml to refer to a commit of the Rus
 [dependencies.mongodb]
 git = "https://github.com/mongodb/mongo-rust-driver.git"
 # Commit on ipv6-backport:
-rev = "732dc54b"
+rev = "6ad6c6ec"
 features = ["openssl-tls", "cert-key-password"]
 ```
 
@@ -39,7 +37,13 @@ features = ["3des", "des-insecure", "sha1-insecure"]
 
 Run:
 ```bash
-export CERTPATH
+export MONGODB_URI
+MONGODB_URI="mongodb://[::1]:27017/?tls=true"
+MONGODB_URI+="&tlsCAFile=$CERTPATH/ca.pem"
+MONGODB_URI+="&tlsCertificateKeyFile=$CERTPATH/client-pkcs8-encrypted.pem"
+MONGODB_URI+="&tlsCertificateKeyFilePassword=password"
+MONGODB_URI+="&serverSelectionTimeoutMS=2000";
+
 cargo run
 ```
 
