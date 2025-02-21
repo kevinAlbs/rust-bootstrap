@@ -4,6 +4,9 @@ To test, start a server with [test certificates](https://github.com/mongodb-labs
 export MONGODB="$HOME/mongodb-linux-x86_64-enterprise-ubuntu2004-4.4.29/bin/"
 export CERTPATH="$HOME/drivers-evergreen-tools/.evergreen/x509gen"
 
+# Make .menv directory if it does not already exists.
+[ -d .menv ] || mkdir .menv
+
 $MONGODB/mongod \
     --tlsCAFile=$CERTPATH/ca.pem \
     --tlsCertificateKeyFile=$CERTPATH/server.pem \
