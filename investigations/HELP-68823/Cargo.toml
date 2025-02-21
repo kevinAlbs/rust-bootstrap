@@ -9,7 +9,7 @@ edition = "2021"
 git = "https://github.com/mongodb/mongo-rust-driver.git"
 # Commit on ipv6-backport:
 rev = "6ad6c6ec"
-features = ["openssl-tls", "cert-key-password"]
+features = ["openssl-tls", "cert-key-password", "tracing-unstable"]
 
 # Add pkcs8 with feature flags to enable insecure algorithms.
 # Due to "Feature unification", this enables feature flags for mongodb driver.
@@ -18,5 +18,6 @@ version = "0.10.2"
 features = ["3des", "des-insecure", "sha1-insecure"]
 
 [dependencies]
+tracing-subscriber = "0.3"
 tokio = "1.0"
 openssl = { version = "0.10" }
