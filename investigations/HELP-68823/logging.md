@@ -38,5 +38,3 @@ This should print logs like:
 
 Run once with a failure (with `--release`?) and once with a success. That might help identify the cause of connection close. Support can post logs in the HELP ticket.
 
-
-Recommend: on retry, recreate client.
