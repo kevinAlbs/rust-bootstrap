@@ -2,7 +2,7 @@
 // Document - random access.
 // RawDocumentBuf - owned. Backed by bytes.
 
-use mongodb::bson;
+use bson::{self, Bson};
 use serde::de::{MapAccess, Visitor};
 use serde::{ser::SerializeMap, Deserialize, Serialize, Serializer};
 use std::fmt;
@@ -28,7 +28,7 @@ fn main() {
             .unwrap()
             .to_writer(&mut book_bytes)
             .expect("should write bytes");
-        println!("struct => BSON data: {:?}", book_bytes);
+        println!("{:20}: {:?}", "struct => BSON data", book_bytes);
     }
 
     // BSON data => struct.
@@ -40,7 +40,7 @@ fn main() {
         let book_document = bson::Document::from_reader(&mut book_bytes.as_slice()).unwrap();
         let book_bson: bson::Bson = bson::Bson::Document(book_document);
         let book_struct: Book = bson::from_bson(book_bson).unwrap();
-        println!("BSON data => struct: {:?}", book_struct);
+        println!("{:20}: {:?}", "BSON data => struct", book_struct);
     }
 
     // struct => EJSON.
@@ -48,7 +48,7 @@ fn main() {
         let book_bson = bson::to_bson(&book).unwrap();
         let book_ejson: serde_json::Value = book_bson.into_canonical_extjson();
         let book_ejson_str = book_ejson.to_string();
-        println!("struct => EJSON: {:?}", book_ejson_str);
+        println!("{:20}: {}", "struct => EJSON", book_ejson_str);
     }
 
     // EJSON => struct.
@@ -57,7 +57,24 @@ fn main() {
         let book_ejson: serde_json::Value = serde_json::from_str(book_ejson_str).unwrap();
         let book_bson: bson::Bson = book_ejson.try_into().unwrap();
         let book_struct: Book = bson::from_bson(book_bson).unwrap();
-        println!("EJSON => struct: {:?}", book_struct);
+        println!("{:20}: {:?}", "EJSON => struct", book_struct);
+    }
+
+    // bson::Document to EJSON.
+    {
+        let mut doc = bson::Document::new();
+        doc.insert("foo", 123);
+        let ejson_str = Bson::Document(doc).into_canonical_extjson().to_string();
+        println!("{:20}: {:?}", "Document => EJSON", ejson_str); // {"foo":{"$numberInt":"123"}}
+    }
+
+    // bson::Document => JSON.
+    {
+        let mut doc = bson::Document::new();
+        doc.insert("foo", 123);
+        let bson = Bson::Document(doc);
+        let json_str = serde_json::to_string(&bson).expect("should serialize");
+        println!("{:20}: {}", "Document => JSON", json_str); // {"foo":123}
     }
 
     // BSON data => EJSON.
@@ -70,7 +87,7 @@ fn main() {
         let book_bson: bson::Bson = bson::Bson::Document(book_document);
         let book_ejson: serde_json::Value = book_bson.into_canonical_extjson();
         let book_ejson_str = book_ejson.to_string();
-        println!("BSON data => EJSON: {:?}", book_ejson_str);
+        println!("{:20}: {:?}", "BSON data => EJSON", book_ejson_str);
     }
 
     // EJSON => BSON data.
@@ -84,7 +101,7 @@ fn main() {
             .unwrap()
             .to_writer(&mut book_bytes)
             .expect("should write bytes");
-        println!("EJSON => BSON data: {:?}", book_bytes);
+        println!("{:20}: {:?}", "EJSON => BSON data", book_bytes);
     }
 
     // Implement Serialize and Deserialize.
