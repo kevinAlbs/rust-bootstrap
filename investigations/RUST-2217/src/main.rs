@@ -1,3 +1,4 @@
+
 use mongodb::{
     bson::doc,
     options::ClientOptions,
@@ -17,3 +18,4 @@ async fn main() -> mongodb::error::Result<()> {
 
     Ok(())
 }
+

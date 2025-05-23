@@ -5,7 +5,7 @@
 use bson::{self, Bson};
 use serde::de::{MapAccess, Visitor};
 use serde::{ser::SerializeMap, Deserialize, Serialize, Serializer};
-use std::fmt;
+use std::{fmt, u32};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Book {
@@ -18,6 +18,35 @@ fn main() {
         title: "foo".to_string(),
         pages: 123,
     };
+
+    use bson::spec::ElementType;
+    {
+        assert_eq!(bson::to_bson(&123i32).unwrap().element_type(), ElementType::Int32);
+        assert_eq!(bson::to_bson(&123i64).unwrap().element_type(), ElementType::Int64);
+        assert_eq!(bson::to_bson(&123u16).unwrap().element_type(), ElementType::Int32);
+
+        // u32 deserializes to BSON Int64. I expect this is OK. u32::MAX cannot fit in Int32.
+        assert_eq!(bson::to_bson(&123u32).unwrap().element_type(), ElementType::Int64);
+        assert_eq!(bson::to_bson(&123u64).unwrap().element_type(), ElementType::Int64);
+        
+
+        let input : i64 =  123;
+        let got = bson::to_bson(&input).expect("ok");
+        assert_eq!(got.element_type(), bson::spec::ElementType::Int64);
+
+        let input : u32 =  123;
+        let got = bson::to_bson(&input).expect("ok");
+        assert_eq!(got.element_type(), bson::spec::ElementType::Int64);
+
+        let input : u32 =  u32::MAX;
+        let got = bson::to_bson(&input).expect("ok");
+        assert_eq!(got.element_type(), bson::spec::ElementType::Int64);
+
+        let b : bson::Bson = serde_json::from_str("[1,-1]").expect("ok");
+        println!("{}", b.into_canonical_extjson().to_string());
+        
+    }
+
 
     // struct => BSON data.
     {

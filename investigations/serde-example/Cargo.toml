@@ -11,4 +11,4 @@ serde_json = "1.0.1"
 tokio = { version = "1.0", features = ["full"] }
 futures = "0.3"
 util = { path = "../../util" }
-bson = "2.13.0"
+bson = { path = "/Users/kevin.albertson/code/bson-rust" }
