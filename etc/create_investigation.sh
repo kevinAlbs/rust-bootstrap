@@ -16,12 +16,14 @@ popd
 # Append dependencies. Assumes last line in `Cargo.toml` is `[dependencies]`
 cat <<EOF >> investigations/$NAME/Cargo.toml
 serde = { version = "1.0", features = ["derive"] }
+tokio = "1.0"
 [dependencies.mongodb]
 version = "3.2.3"
 EOF
 
 # TODO: Create async.
 cat <<EOF > investigations/$NAME/src/main.rs
+use tokio;
 
 use mongodb::{
     bson::doc,

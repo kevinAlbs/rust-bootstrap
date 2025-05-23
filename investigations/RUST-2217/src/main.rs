@@ -5,6 +5,8 @@ use mongodb::{
     Client,
 };
 
+use tokio;
+
 #[tokio::main]
 async fn main() -> mongodb::error::Result<()> {
     let uri = "mongodb://localhost:27017";
