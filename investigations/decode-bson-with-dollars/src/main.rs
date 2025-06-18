@@ -7,7 +7,7 @@ fn main() {
     let bytes = hex::decode(hex).unwrap();
     bytes.as_mut_slice()
     let doc = Document::from_reader(&mut bytes.as_slice()).unwrap();
-    // The '$numberInto' is misinterpreted as EJSON!
+    // The '$numberInt' is misinterpreted as EJSON!
     println!("{}", doc); // { "foo": 123 }
     
     // Compared with pymongo:
