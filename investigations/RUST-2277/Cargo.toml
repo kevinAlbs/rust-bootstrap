@@ -1,0 +1,19 @@
+[package]
+name = "testdriver"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies.mongodb]
+features = ["in-use-encryption"]
+
+[dependencies.serde]
+version = "1.0.125"
+
+[dependencies]
+serde_json = "1.0"
+tokio = "1.0"
+
+# In Cargo.toml, add the following dependency.
+futures = "0.3"
