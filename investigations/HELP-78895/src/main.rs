@@ -12,7 +12,7 @@ async fn main() -> mongodb::error::Result<()> {
     println!("Testing with URI: {}", uri);
 
     {
-        print!("Testing default resolver ... ");
+        print!("Testing system resolver ... ");
         let opts = ClientOptions::parse(uri.clone()).await?;
         let client = Client::with_options(opts)?;
         let res = client
