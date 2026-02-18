@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use tokio;
 
 use mongodb::{
@@ -38,12 +36,12 @@ async fn main() -> mongodb::error::Result<()> {
     let counters = Arc::new(Mutex::new(HashSet::<String>::new()));
 
     let counters_ref = counters.clone();
-    // Wait for all heartbeats to succeed
+    // Wait for all servers to initially be discovered
     opts.sdam_event_handler = Some(EventHandler::callback(move |ev| {
         match ev {
-            sdam::SdamEvent::ServerHeartbeatSucceeded(ev) => {
-                println!("Heartbeat succeeded to: {}", ev.server_address);
-                counters_ref.lock().unwrap().insert(ev.server_address.to_string());
+            sdam::SdamEvent::ServerDescriptionChanged(ev) => {
+                println!("Server Description changed for: {} from {} to {}", ev.new_description.address(), ev.previous_description.server_type(), ev.new_description.server_type());
+                counters_ref.lock().unwrap().insert(ev.new_description.address().to_string());
             }
             _ => (),
         }
