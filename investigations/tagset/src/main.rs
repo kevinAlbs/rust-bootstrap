@@ -66,7 +66,7 @@ async fn main() -> mongodb::error::Result<()> {
         })
     };
 
-    // Await a successful heartbeat to all three servers:
+    // Await initial discovery of all three servers:
     {
         let mut servers_discovered = counters.lock().unwrap().len();
         while servers_discovered < 3 {
