@@ -1,0 +1,46 @@
+{
+  "id": "repl0",
+  "members": [
+    {
+      "procParams": {
+        "ipv6": true,
+        "bind_ip": "127.0.0.1,::1",
+        "oplogSize": 500,
+        "port": 27017
+      },
+      "rsParams": {
+        "_id": 0,
+        "priority": 0,
+        "tags": {
+          "nodeType": "ANALYTICS"
+        }
+      }
+    },
+    {
+      "procParams": {
+        "ipv6": true,
+        "bind_ip": "127.0.0.1,::1",
+        "oplogSize": 500,
+        "port": 27018
+      },
+      "rsParams": {
+        "_id": 1,
+        "priority": 0,
+        "tags": {}
+      }
+    },
+    {
+      "procParams": {
+        "ipv6": true,
+        "bind_ip": "127.0.0.1,::1",
+        "oplogSize": 500,
+        "port": 27019
+      },
+      "rsParams": {
+        "_id": 2,
+        "priority": 1,
+        "tags": {}
+      }
+    }
+  ]
+}
