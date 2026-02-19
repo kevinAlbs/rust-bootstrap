@@ -11,4 +11,4 @@ cd $DRIVERS_TOOLS
 TOPOLOGY=replica_set ORCHESTRATION_FILE=analytics-node-replset-config.json make run-server
 ```
 
-As a workaround:
+
