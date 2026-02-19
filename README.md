@@ -51,6 +51,9 @@ let path = {
 
 # Rust Q&A
 
+## Q4: Does Rust support socketTimeoutMS?
+A: No. See RUST-2321.
+
 ## Q3: How to get stdout for test?
 A: cargo test -- --show-output
 
